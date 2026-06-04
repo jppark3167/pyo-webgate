@@ -39,16 +39,15 @@ function fmtXlDate(v) {
   return String(v).slice(0, 10);
 }
 
+// 💡 향상된 유연한 엑셀 파싱 로직 (최대 30행 탐색 & 다중 키워드 매칭)
 function parseExcelDynamic(rawArray, keyIdentifiers) {
   let headerIdx = -1;
   let headers = [];
 
-  // 1. ERP 엑셀 상단의 타이틀이나 공백을 고려해 최대 30행까지 깊게 탐색
   for (let i = 0; i < Math.min(30, rawArray.length); i++) {
     if (!rawArray[i]) continue;
     const rowStr = rawArray[i].join("").replace(/\s/g, "");
 
-    // 2. 다중 키워드(배열 안의 배열) 처리로 유연한 헤더 매칭 (OR 조건)
     const isHeader = keyIdentifiers.every(k => {
       if (Array.isArray(k)) {
         return k.some(subKey => rowStr.includes(subKey));
@@ -68,10 +67,8 @@ function parseExcelDynamic(rawArray, keyIdentifiers) {
   const data = [];
   for (let i = headerIdx + 1; i < rawArray.length; i++) {
     const row = rawArray[i];
-    // 빈 행 스킵
     if (!row || row.length === 0 || !row.some(c => c)) continue;
 
-    // 3. '총계', '합계' 등 불필요한 행 스킵
     const firstCell = str(row[0]).toUpperCase();
     if (firstCell.includes("TOTAL") || firstCell.includes("합계") || firstCell.includes("총계")) continue;
 
@@ -120,12 +117,6 @@ const TD = { padding: "8px 10px", fontSize: 13, color: "#374151", borderBottom: 
 const ShipBadge = ({ status }) => {
   const s = STATUS[status] || STATUS.unknown;
   return <span style={{ background: s.bg, color: s.txt, border: `1px solid ${s.bdr}`, padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>{s.label}</span>;
-};
-const MatBadge = ({ val = "" }) => {
-  if (!val || val.includes("이상없음")) return <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>이상없음</span>;
-  if (val.includes("확인")) return <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>확인중</span>;
-  if (val.includes("입고")) return <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>입고예정</span>;
-  return <span style={{ background: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: 8, fontSize: 11 }}>{val.slice(0, 8)}</span>;
 };
 
 function DropZone({ label, icon, accept, onFile, loaded, fileName }) {
@@ -202,15 +193,24 @@ export default function App() {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-        const parsed = parseExcelDynamic(raw, ["생산계획", "모델", "수량"]);
+
+        // 유연한 생산계획 헤더 매칭
+        const parsed = parseExcelDynamic(raw, [
+          ["생산", "계획", "출하"],
+          ["모델", "품명", "제품코드", "품번"],
+          ["수량", "계획수량"]
+        ]);
+
         const mapped = parsed.map(r => ({
-          생산계획일자: fmtXlDate(r["생산계획일자"] || r["생산일"]),
-          출하일자: fmtXlDate(r["출하일자"] || r["출하일"]),
-          고객명: str(r["고객명"] || r["고객"]),
-          제조지시서번호: str(r["제조지시서번호"] || r["지시서번호"]),
-          수량: num(r["수량"]), 모델명: str(r["모델명"] || r["모델"]), 제품코드: str(r["제품코드"] || r["품번"]),
-          규격: str(r["규격"] || r["스펙"]), 향지: str(r["향지"]), FW버전: str(r["FW버전"] || r["펌웨어"]),
-          자재현황: str(r["자재현황"] || r["자재"]), 비고: str(r["비고"] || r["NOTE"])
+          생산계획일자: fmtXlDate(r["생산계획일자"] || r["생산일"] || r["계획일"]),
+          출하일자: fmtXlDate(r["출하일자"] || r["출하일"] || r["납기일"]),
+          고객명: str(r["고객명"] || r["고객"] || r["거래처"]),
+          제조지시서번호: str(r["제조지시서번호"] || r["지시서번호"] || r["지시번호"]),
+          수량: num(r["수량"] || r["계획수량"]),
+          모델명: str(r["모델명"] || r["모델"] || r["품명"]),
+          제품코드: str(r["제품코드"] || r["품번"] || r["품목코드"]),
+          규격: str(r["규격"] || r["스펙"] || r["SPEC"]),
+          비고: str(r["비고"] || r["NOTE"])
         })).filter(r => r.고객명 && r.수량 > 0);
 
         if (mapped.length > 0) { setProdData(mapped); setParseMsg(`✅ 생산계획 ${mapped.length}건 로드 완료`); }
@@ -229,7 +229,7 @@ export default function App() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        // 💡 핵심: '품번'과 '재고수량'을 의미하는 다양한 텍스트를 모두 허용
+        // 유연한 재고현황 헤더 매칭
         const parsed = parseExcelDynamic(raw, [
           ["품번", "품목코드", "품목번호", "제품코드", "ITEM_CODE"],
           ["재고수량", "현재고", "수량", "재고", "실재고"]
@@ -244,46 +244,8 @@ export default function App() {
         })).filter(r => r.품번);
 
         if (mapped.length > 0) { setInvData(mapped); setParseMsg(`✅ 재고현황 ${mapped.length}품목 로드 완료`); }
-        else { setParseMsg("⚠️ 재고현황 데이터를 찾을 수 없습니다. (헤더명 불일치)"); }
+        else { setParseMsg("⚠️ 재고현황 데이터를 찾을 수 없습니다."); }
       } catch (err) { setParseMsg("❌ 재고현황 파싱 오류: " + err.message); }
-    };
-    reader.readAsArrayBuffer(file);
-  }, []);
-
-  const handleProdFile = useCallback(file => {
-    setProdFile(file.name);
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-        // 💡 생산계획 엑셀의 다양한 양식 지원
-        const parsed = parseExcelDynamic(raw, [
-          ["생산", "계획", "출하"],
-          ["모델", "품명", "제품코드", "품번"],
-          ["수량", "계획수량"]
-        ]);
-
-        const mapped = parsed.map(r => ({
-          생산계획일자: fmtXlDate(r["생산계획일자"] || r["생산일"] || r["계획일"]),
-          출하일자: fmtXlDate(r["출하일자"] || r["출하일"] || r["납기일"]),
-          고객명: str(r["고객명"] || r["고객"] || r["거래처"]),
-          제조지시서번호: str(r["제조지시서번호"] || r["지시서번호"] || r["지시번호"]),
-          수량: num(r["수량"] || r["계획수량"]),
-          모델명: str(r["모델명"] || r["모델"] || r["품명"]),
-          제품코드: str(r["제품코드"] || r["품번"] || r["품목코드"]),
-          규격: str(r["규격"] || r["스펙"] || r["SPEC"]),
-          향지: str(r["향지"]),
-          FW버전: str(r["FW버전"] || r["펌웨어"]),
-          자재현황: str(r["자재현황"] || r["자재"]),
-          비고: str(r["비고"] || r["NOTE"])
-        })).filter(r => r.고객명 && r.수량 > 0);
-
-        if (mapped.length > 0) { setProdData(mapped); setParseMsg(`✅ 생산계획 ${mapped.length}건 로드 완료`); }
-        else { setParseMsg("⚠️ 생산계획 데이터를 찾을 수 없습니다."); }
-      } catch (err) { setParseMsg("❌ 생산계획 파싱 오류: " + err.message); }
     };
     reader.readAsArrayBuffer(file);
   }, []);
@@ -330,6 +292,17 @@ export default function App() {
       return mQ && mD && mS;
     });
   }, [prodEnriched, search, filterDate, filterStatus]);
+
+  // 💡 출하의뢰 전용 필터 로직
+  const filteredShip = useMemo(() => {
+    const q = search.toLowerCase();
+    return shipEnriched.filter(r => {
+      const mQ = !q || r.거래처명?.toLowerCase().includes(q) || r.품목명?.toLowerCase().includes(q) || r.품목번호?.toLowerCase().includes(q);
+      const mD = !filterDate || r.납기일자 === filterDate;
+      const mS = filterStatus === "all" || r._status === filterStatus;
+      return mQ && mD && mS;
+    });
+  }, [shipEnriched, search, filterDate, filterStatus]);
 
   const negInvList = useMemo(() => invData.filter(r => r.재고수량 < 0), [invData]);
 
@@ -400,11 +373,13 @@ export default function App() {
       </div>
 
       <div className="page-container" style={{ padding: "14px 16px" }}>
+
+        {/* 1. 생산계획 탭 (자재 열 제거됨) */}
         {mainTab === "prod" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-                <thead><tr>{["상태", "출하일", "고객명", "모델명", "수량", "현재고", "자재", "비고"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <thead><tr>{["상태", "출하일", "고객명", "모델명", "수량", "현재고", "비고"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
                 <tbody>
                   {filteredProd.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
@@ -414,15 +389,70 @@ export default function App() {
                       <td className="table-td" style={TD}>{r.모델명}</td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
-                      <td className="table-td" style={TD}><MatBadge val={r.자재현황} /></td>
                       <td className="table-td" style={{ ...TD, whiteSpace: "normal", wordBreak: "keep-all", minWidth: "100px", fontSize: 11 }}>{r.비고}</td>
                     </tr>
                   ))}
+                  {filteredProd.length === 0 && <tr><td colSpan="7" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>데이터가 없습니다.</td></tr>}
                 </tbody>
               </table>
             </div>
           </div>
         )}
+
+        {/* 2. 출하의뢰 탭 (신규 추가) */}
+        {mainTab === "ship" && (
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+            <div className="swipe-menu">
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "700px" }}>
+                <thead><tr>{["상태", "납기일자", "거래처명", "품목명", "수량", "현재고", "담당자", "진행상태"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {filteredShip.map((r, i) => (
+                    <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
+                      <td className="table-td" style={TD}><ShipBadge status={r._status} /></td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#0369a1" }}>{fmtD(r.납기일자)}</td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.거래처명}</td>
+                      <td className="table-td" style={TD}>
+                        <div>{r.품목명}</div>
+                        <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{r.품목번호}</div>
+                      </td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
+                      <td className="table-td" style={TD}>{r.담당자}</td>
+                      <td className="table-td" style={TD}>
+                        <span style={{ background: "#f1f5f9", padding: "3px 8px", borderRadius: 4, fontSize: 11, color: "#475569" }}>{r.상태}</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredShip.length === 0 && <tr><td colSpan="8" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>출하의뢰 데이터가 없습니다.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 3. 마이너스 재고 탭 (보너스 구현) */}
+        {mainTab === "inv" && (
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+            <div className="swipe-menu">
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "500px" }}>
+                <thead><tr>{["상태", "품번", "품명", "규격", "재고수량"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {negInvList.map((r, i) => (
+                    <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
+                      <td className="table-td" style={TD}><ShipBadge status="neg" /></td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 700 }}>{r.품번}</td>
+                      <td className="table-td" style={TD}>{r.품명}</td>
+                      <td className="table-td" style={{ ...TD, color: "#64748b", fontSize: 11 }}>{r.규격}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700, color: "#ef4444" }}>{fmtN(r.재고수량)}</td>
+                    </tr>
+                  ))}
+                  {negInvList.length === 0 && <tr><td colSpan="5" style={{ ...TD, textAlign: "center", padding: "30px", color: "#166534", fontWeight: 700 }}>🎉 마이너스 재고가 없습니다!</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
       </div>
     </>
   );
