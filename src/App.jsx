@@ -354,7 +354,6 @@ export default function App() {
           { key: "shortage", label: "❌ 재고부족", cnt: prodStats.shortage, color: "#991b1b" },
           { key: "unknown", label: "⚠️ 미확인", cnt: prodStats.unknown, color: "#713f12" }
         ].map(s => (
-          // 💡 버튼 내 텍스트와 숫자 수직 중앙 정렬 (display: flex, alignItems: center)
           <button key={s.key} className="stat-btn" onClick={() => { setFilterStatus(s.key); }} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, background: filterStatus === s.key ? STATUS[s.key]?.bg || "#f1f5f9" : "#f8fafc", border: `1.5px solid ${filterStatus === s.key ? s.color + "55" : "#e2e8f0"}`, borderRadius: 8, padding: "6px 13px", cursor: "pointer", fontSize: 12, fontWeight: filterStatus === s.key ? 700 : 400, color: filterStatus === s.key ? s.color : "#64748b" }}>
             {s.label} <strong style={{ lineHeight: 1 }}>{s.cnt}</strong>
           </button>
@@ -367,7 +366,6 @@ export default function App() {
           { key: "prod", label: "📋 생산계획" },
           { key: "inv", label: "⚠️ 마이너스재고", extra: negInvList.length }
         ].map(t => (
-          // 💡 탭 버튼 내 텍스트와 뱃지 수직 중앙 정렬 (display: flex, alignItems: center)
           <button key={t.key} className="tab-btn" onClick={() => setMainTab(t.key)} style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 6, padding: "12px 6px", border: "none", background: "transparent", cursor: "pointer", fontWeight: 700, fontSize: 13, borderBottom: mainTab === t.key ? "2.5px solid #3b82f6" : "2.5px solid transparent", color: mainTab === t.key ? "#1d4ed8" : "#94a3b8" }}>
             {t.label}
             {t.extra > 0 && <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: t.key === "inv" ? "#ef4444" : "#f59e0b", color: "#fff", borderRadius: 10, padding: "2px 7px", fontSize: 10, fontWeight: 700, lineHeight: 1, minHeight: "18px" }}>{t.extra}</span>}
@@ -382,7 +380,7 @@ export default function App() {
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "700px" }}>
-                <thead><tr>{["상태", "납기일자", "거래처명", "품목명", "수량", "현재고", "담당자", "진행상태"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <thead><tr>{["상태", "납기일자", "거래처명", "품목명", "수량", "현재고", "담당자", "진행상태"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["수량", "현재고"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
                 <tbody>
                   {filteredShip.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
@@ -408,12 +406,12 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. 생산계획 탭 (💡 상태 열 제거 완료) */}
+        {/* 2. 생산계획 탭 (💡 상태 데이터 셀 완벽 제거 완료) */}
         {mainTab === "prod" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "550px" }}>
-                <thead><tr>{["출하일", "고객명", "모델명", "수량", "현재고", "비고"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <thead><tr>{["출하일", "고객명", "모델명", "수량", "현재고", "비고"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["수량", "현재고"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
                 <tbody>
                   {filteredProd.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
@@ -437,7 +435,7 @@ export default function App() {
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "500px" }}>
-                <thead><tr>{["상태", "품번", "품명", "규격", "재고수량"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <thead><tr>{["상태", "품번", "품명", "규격", "재고수량"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["재고수량"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
                 <tbody>
                   {negInvList.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
