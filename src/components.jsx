@@ -75,14 +75,19 @@ export function InputView({
 }
 
 export function DashView({
-    mainTab, setMainTab, shipEnriched, prodEnriched, prodStats, filterStatus, setFilterStatus,
-    search, setSearch, sortDesc, setSortDesc, sortedShip, sortedProd, filteredNegInv, negInvList
+    mainTab, setMainTab, shipDomEnriched, shipOvsEnriched, prodEnriched, prodStats, filterStatus, setFilterStatus,
+    search, setSearch, sortDesc, setSortDesc, sortedShipDom, sortedShipOvs, sortedProd, filteredNegInv, negInvList
 }) {
+    // 현재 탭이 출하의뢰(국내/해외)인지 확인하고, 해당 데이터를 가져옵니다.
+    const isShipTab = mainTab === "ship_dom" || mainTab === "ship_ovs";
+    const currentShipData = mainTab === "ship_dom" ? sortedShipDom : sortedShipOvs;
+    const currentTotalCnt = mainTab === 'ship_dom' ? shipDomEnriched.length : (mainTab === 'ship_ovs' ? shipOvsEnriched.length : prodEnriched.length);
+
     return (
         <>
             <div className="swipe-menu" style={{ display: "flex", gap: 8, padding: "10px 18px", background: "#fff", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
                 {[
-                    { key: "all", label: "전체", cnt: mainTab === 'ship' ? shipEnriched.length : prodEnriched.length, color: "#475569" },
+                    { key: "all", label: "전체", cnt: currentTotalCnt, color: "#475569" },
                     { key: "ok", label: "✅ 출하가능", cnt: prodStats.ok, color: "#166534" },
                     { key: "shortage", label: "❌ 재고부족", cnt: prodStats.shortage, color: "#991b1b" },
                     { key: "unknown", label: "⚠️ 미확인", cnt: prodStats.unknown, color: "#713f12" }
@@ -95,7 +100,8 @@ export function DashView({
 
             <div className="swipe-menu" style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 18px", display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
                 {[
-                    { key: "ship", label: "🚚 출하의뢰", extra: shipEnriched.filter(r => r._status !== "ok").length },
+                    { key: "ship_dom", label: "🚚 (국내)출하의뢰", extra: shipDomEnriched.filter(r => r._status !== "ok").length },
+                    { key: "ship_ovs", label: "✈️ (해외)출하의뢰", extra: shipOvsEnriched.filter(r => r._status !== "ok").length },
                     { key: "prod", label: "📋 생산계획" },
                     { key: "inv", label: "⚠️ 마이너스재고", extra: negInvList.length }
                 ].map(t => (
@@ -117,7 +123,7 @@ export function DashView({
                         style={{ width: "100%", padding: "10px 10px 10px 34px", borderRadius: 8, border: "1px solid #cbd5e1", outline: "none", boxSizing: "border-box", fontSize: 13, color: "#334155" }}
                     />
                 </div>
-                {(mainTab === "ship" || mainTab === "prod") && (
+                {(isShipTab || mainTab === "prod") && (
                     <button
                         onClick={() => setSortDesc(!sortDesc)}
                         style={{ background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, padding: "0 12px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#334155", whiteSpace: "nowrap" }}
@@ -128,8 +134,9 @@ export function DashView({
             </div>
 
             <div className="page-container" style={{ padding: "14px 16px" }}>
-                {/* 1. 출하의뢰 탭 */}
-                {mainTab === "ship" && (
+
+                {/* 1. 출하의뢰 탭 (국내/해외 공통 렌더링) */}
+                {isShipTab && (
                     <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
                         <div className="swipe-menu">
                             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "700px" }}>
@@ -146,7 +153,7 @@ export function DashView({
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {sortedShip.map((r, i) => (
+                                    {currentShipData.map((r, i) => (
                                         <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
                                             <td className="table-td" style={{ ...TD, textAlign: "left" }}><ShipBadge status={r._status} /></td>
                                             <td className="table-td" style={{ ...TD, textAlign: "left", fontWeight: 700, color: "#0369a1" }}>{fmtD(r.납기일자)}</td>
@@ -160,7 +167,7 @@ export function DashView({
                                             <td className="table-td" style={{ ...TD, textAlign: "left" }}><span style={{ background: "#f1f5f9", padding: "3px 8px", borderRadius: 4, fontSize: 11, color: "#475569" }}>{r.상태}</span></td>
                                         </tr>
                                     ))}
-                                    {sortedShip.length === 0 && <tr><td colSpan="8" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>{search ? "검색 결과가 없습니다." : "데이터가 없습니다."}</td></tr>}
+                                    {currentShipData.length === 0 && <tr><td colSpan="8" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>{search ? "검색 결과가 없습니다." : "데이터가 없습니다."}</td></tr>}
                                 </tbody>
                             </table>
                         </div>
