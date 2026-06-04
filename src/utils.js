@@ -1,4 +1,4 @@
-// ── 모바일 반응형을 위한 내부 CSS ──────────────────────────
+// ── 모바일 반응형 CSS ──────────────────────────
 export const globalCss = `
   .swipe-menu { overflow-x: auto; -webkit-overflow-scrolling: touch; -ms-overflow-style: none; scrollbar-width: none; }
   .swipe-menu::-webkit-scrollbar { display: none; }
@@ -12,7 +12,7 @@ export const globalCss = `
   }
 `;
 
-// ── 유틸리티 함수 및 상수 ──────────────────────────────────
+// ── 유틸리티 함수 ──────────────────────────────────────────
 export const fmtD = s => s?.length >= 10 ? s.slice(5) : (s || "-");
 export const fmtN = n => (typeof n === "number") ? n.toLocaleString("ko-KR") : (n ?? "-");
 export const str = v => (v === null || v === undefined) ? "" : String(v).trim();
@@ -36,23 +36,31 @@ export function fmtXlDate(v) {
 export function parseExcelDynamic(rawArray, keyIdentifiers) {
     let headerIdx = -1;
     let headers = [];
+
     for (let i = 0; i < Math.min(30, rawArray.length); i++) {
         if (!rawArray[i]) continue;
         const rowStr = rawArray[i].join("").replace(/\s/g, "");
-        if (keyIdentifiers.every(k => Array.isArray(k) ? k.some(subKey => rowStr.includes(subKey)) : rowStr.includes(k))) {
+
+        const isHeader = keyIdentifiers.every(k => {
+            if (Array.isArray(k)) return k.some(subKey => rowStr.includes(subKey));
+            return rowStr.includes(k);
+        });
+
+        if (isHeader) {
             headerIdx = i;
             headers = rawArray[i].map(h => str(h).replace(/\n|\r/g, ""));
             break;
         }
     }
-    if (headerIdx === -1) return [];
 
+    if (headerIdx === -1) return [];
     const data = [];
     for (let i = headerIdx + 1; i < rawArray.length; i++) {
         const row = rawArray[i];
         if (!row || row.length === 0 || !row.some(c => c)) continue;
         const firstCell = str(row[0]).toUpperCase();
         if (firstCell.includes("TOTAL") || firstCell.includes("합계") || firstCell.includes("총계")) continue;
+
         const obj = {};
         headers.forEach((colName, idx) => { if (colName) obj[colName] = row[idx]; });
         data.push(obj);
@@ -60,6 +68,7 @@ export function parseExcelDynamic(rawArray, keyIdentifiers) {
     return data;
 }
 
+// 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭
 export function findInv(invData, itemCode) {
     if (!itemCode) return null;
     const cCode = str(itemCode).toUpperCase();
@@ -73,6 +82,7 @@ export function shipStatus(invQty, needed) {
     return "shortage";
 }
 
+// ── 상수 ────────────────────────────────────────────────
 export const STATUS = {
     ok: { bg: "#dcfce7", bdr: "#86efac", txt: "#166534", label: "출하가능" },
     shortage: { bg: "#fee2e2", bdr: "#fca5a5", txt: "#991b1b", label: "재고부족" },
