@@ -79,7 +79,7 @@ function parseExcelDynamic(rawArray, keyIdentifiers) {
   return data;
 }
 
-// 💡 수정됨: 품명 매칭 로직을 완전히 제거하고, 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭
+// 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭
 function findInv(invData, itemCode) {
   if (!itemCode) return null;
   const cCode = str(itemCode).toUpperCase();
@@ -100,7 +100,8 @@ const STATUS = {
   unknown: { bg: "#fef9c3", bdr: "#fde047", txt: "#713f12", label: "미확인" },
 };
 
-const TH = { background: "#f8fafc", padding: "8px 10px", fontSize: 12, color: "#475569", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" };
+// 💡 텍스트 정렬은 인라인으로 직접 제어하기 위해 TH/TD 기본 속성에서 textAlign 제거
+const TH = { background: "#f8fafc", padding: "8px 10px", fontSize: 12, color: "#475569", fontWeight: 700, borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" };
 const TD = { padding: "8px 10px", fontSize: 13, color: "#374151", borderBottom: "1px solid #f1f5f9", verticalAlign: "middle", whiteSpace: "nowrap" };
 
 const ShipBadge = ({ status }) => {
@@ -254,7 +255,6 @@ export default function App() {
     setParseMsg(`✅ 출하의뢰 ${rows.length}건 로드 완료`);
   };
 
-  // 💡 수정됨: 오직 '제품코드' / '품목번호'만 넘겨서 엄격하게 매칭하도록 변경
   const prodEnriched = useMemo(() => prodData.map(r => {
     const inv = findInv(invData, r.제품코드);
     return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
@@ -294,7 +294,6 @@ export default function App() {
 
   const negInvList = useMemo(() => invData.filter(r => r.재고수량 < 0), [invData]);
 
-  // 마이너스 재고 탭도 검색이 가능하도록 필터 추가
   const filteredNegInv = useMemo(() => {
     const q = search.toLowerCase();
     return negInvList.filter(r =>
@@ -371,7 +370,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* 💡 검색 바 추가 */}
       <div style={{ padding: "14px 16px 0", maxWidth: "100%" }}>
         <div style={{ position: "relative" }}>
           <span style={{ position: "absolute", left: 12, top: 9, fontSize: 14 }}>🔍</span>
@@ -387,26 +385,39 @@ export default function App() {
 
       <div className="page-container" style={{ padding: "14px 16px" }}>
 
-        {/* 1. 출하의뢰 탭 */}
+        {/* 1. 출하의뢰 탭 (총 8개 열 1:1 완벽 고정 매칭) */}
         {mainTab === "ship" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "700px" }}>
-                <thead><tr>{["상태", "납기일자", "거래처명", "품목명", "수량", "현재고", "담당자", "진행상태"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["수량", "현재고"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
+                <thead>
+                  <tr>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>상태</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>납기일자</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>거래처명</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>품명</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "right" }}>수량</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "right" }}>현재고</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>담당자</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>진행상태</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {filteredShip.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
-                      <td className="table-td" style={TD}><ShipBadge status={r._status} /></td>
-                      <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#0369a1" }}>{fmtD(r.납기일자)}</td>
-                      <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.거래처명}</td>
-                      <td className="table-td" style={TD}>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}><ShipBadge status={r._status} /></td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", fontWeight: 700, color: "#0369a1" }}>{fmtD(r.납기일자)}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", fontWeight: 600 }}>{r.거래처명}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}>
                         <div>{r.품목명}</div>
                         <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{r.품목번호}</div>
                       </td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
-                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
-                      <td className="table-td" style={TD}>{r.담당자}</td>
-                      <td className="table-td" style={TD}>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700, color: r._inv ? "inherit" : "#ef4444" }}>
+                        {r._inv ? fmtN(r._inv.재고수량) : "확인필요"}
+                      </td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}>{r.담당자}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}>
                         <span style={{ background: "#f1f5f9", padding: "3px 8px", borderRadius: 4, fontSize: 11, color: "#475569" }}>{r.상태}</span>
                       </td>
                     </tr>
@@ -418,24 +429,30 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. 생산계획 탭 */}
+        {/* 2. 생산계획 탭 (딱 6개 열만 1:1 완벽 고정 매칭) */}
         {mainTab === "prod" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "550px" }}>
-                <thead><tr>{["출하일", "고객명", "모델명", "수량", "현재고", "비고"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["수량", "현재고"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
+                <thead>
+                  <tr>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>생산계획일</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>출하일</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>고객명</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "right" }}>수량</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>모델명</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>제품코드</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {filteredProd.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
-                      <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#1d4ed8" }}>{fmtD(r.출하일자)}</td>
-                      <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.고객명}</td>
-                      <td className="table-td" style={TD}>
-                        <div>{r.모델명}</div>
-                        <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{r.제품코드}</div>
-                      </td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}>{fmtD(r.생산계획일자)}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", fontWeight: 700, color: "#1d4ed8" }}>{fmtD(r.출하일자)}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", fontWeight: 600 }}>{r.고객명}</td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
-                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
-                      <td className="table-td" style={{ ...TD, whiteSpace: "normal", wordBreak: "keep-all", minWidth: "100px", fontSize: 11 }}>{r.비고}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}>{r.모델명}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", color: "#64748b" }}>{r.제품코드}</td>
                     </tr>
                   ))}
                   {filteredProd.length === 0 && <tr><td colSpan="6" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>{search ? "검색 결과가 없습니다." : "데이터가 없습니다."}</td></tr>}
@@ -445,19 +462,27 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. 마이너스 재고 탭 */}
+        {/* 3. 마이너스 재고 탭 (총 5개 열 1:1 완벽 고정 매칭) */}
         {mainTab === "inv" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "500px" }}>
-                <thead><tr>{["상태", "품번", "품명", "규격", "재고수량"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["재고수량"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
+                <thead>
+                  <tr>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>상태</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>품번</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>품명</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "left" }}>규격</th>
+                    <th className="table-th" style={{ ...TH, textAlign: "right" }}>재고수량</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {filteredNegInv.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
-                      <td className="table-td" style={TD}><ShipBadge status="neg" /></td>
-                      <td className="table-td" style={{ ...TD, fontWeight: 700 }}>{r.품번}</td>
-                      <td className="table-td" style={TD}>{r.품명}</td>
-                      <td className="table-td" style={{ ...TD, color: "#64748b", fontSize: 11 }}>{r.규격}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}><ShipBadge status="neg" /></td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", fontWeight: 700 }}>{r.품번}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left" }}>{r.품명}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "left", color: "#64748b", fontSize: 11 }}>{r.규격}</td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700, color: "#ef4444" }}>{fmtN(r.재고수량)}</td>
                     </tr>
                   ))}
