@@ -79,22 +79,11 @@ function parseExcelDynamic(rawArray, keyIdentifiers) {
   return data;
 }
 
-function findInv(invData, prodCode, modelName) {
-  if (!prodCode && !modelName) return null;
-  const cCode = str(prodCode).toUpperCase();
-  const cModel = str(modelName).toUpperCase();
-  let hit = invData.find(r => str(r.품번).toUpperCase() === cCode);
-  if (hit) return hit;
-  const base = cCode.replace(/-\d+T\d+[\/\w]*$/, "").replace(/\(P2P\)/, "").trim();
-  if (base.length > 5) {
-    hit = invData.find(r => r.품번?.toUpperCase().startsWith(base) || r.품명?.toUpperCase().startsWith(base));
-    if (hit) return hit;
-  }
-  if (cModel.length > 3) {
-    hit = invData.find(r => r.품명?.toUpperCase().includes(cModel) || r.품번?.toUpperCase().includes(cModel));
-    if (hit) return hit;
-  }
-  return null;
+// 💡 수정됨: 품명 매칭 로직을 완전히 제거하고, 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭
+function findInv(invData, itemCode) {
+  if (!itemCode) return null;
+  const cCode = str(itemCode).toUpperCase();
+  return invData.find(r => str(r.품번).toUpperCase() === cCode) || null;
 }
 
 function shipStatus(invQty, needed) {
@@ -265,13 +254,14 @@ export default function App() {
     setParseMsg(`✅ 출하의뢰 ${rows.length}건 로드 완료`);
   };
 
+  // 💡 수정됨: 오직 '제품코드' / '품목번호'만 넘겨서 엄격하게 매칭하도록 변경
   const prodEnriched = useMemo(() => prodData.map(r => {
-    const inv = findInv(invData, r.제품코드, r.모델명);
+    const inv = findInv(invData, r.제품코드);
     return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
   }), [prodData, invData]);
 
   const shipEnriched = useMemo(() => shipData.map(r => {
-    const inv = findInv(invData, r.품목번호 || r.품목명, r.품목명);
+    const inv = findInv(invData, r.품목번호);
     return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
   }), [shipData, invData]);
 
@@ -303,6 +293,14 @@ export default function App() {
   }, [shipEnriched, search, filterDate, filterStatus]);
 
   const negInvList = useMemo(() => invData.filter(r => r.재고수량 < 0), [invData]);
+
+  // 마이너스 재고 탭도 검색이 가능하도록 필터 추가
+  const filteredNegInv = useMemo(() => {
+    const q = search.toLowerCase();
+    return negInvList.filter(r =>
+      !q || r.품번?.toLowerCase().includes(q) || r.품명?.toLowerCase().includes(q)
+    );
+  }, [negInvList, search]);
 
   const InputView = () => (
     <div className="page-container" style={{ maxWidth: 860, margin: "0 auto", padding: "20px 16px" }}>
@@ -373,6 +371,20 @@ export default function App() {
         ))}
       </div>
 
+      {/* 💡 검색 바 추가 */}
+      <div style={{ padding: "14px 16px 0", maxWidth: "100%" }}>
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 12, top: 9, fontSize: 14 }}>🔍</span>
+          <input
+            type="text"
+            placeholder="품번, 거래처명, 품명 등으로 데이터 필터링..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: "100%", padding: "10px 10px 10px 34px", borderRadius: 8, border: "1px solid #cbd5e1", outline: "none", boxSizing: "border-box", fontSize: 13, color: "#334155" }}
+          />
+        </div>
+      </div>
+
       <div className="page-container" style={{ padding: "14px 16px" }}>
 
         {/* 1. 출하의뢰 탭 */}
@@ -399,14 +411,14 @@ export default function App() {
                       </td>
                     </tr>
                   ))}
-                  {filteredShip.length === 0 && <tr><td colSpan="8" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>출하의뢰 데이터가 없습니다.</td></tr>}
+                  {filteredShip.length === 0 && <tr><td colSpan="8" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>{search ? "검색 결과가 없습니다." : "출하의뢰 데이터가 없습니다."}</td></tr>}
                 </tbody>
               </table>
             </div>
           </div>
         )}
 
-        {/* 2. 생산계획 탭 (💡 상태 데이터 셀 완벽 제거 완료) */}
+        {/* 2. 생산계획 탭 */}
         {mainTab === "prod" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
@@ -417,13 +429,16 @@ export default function App() {
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
                       <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#1d4ed8" }}>{fmtD(r.출하일자)}</td>
                       <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.고객명}</td>
-                      <td className="table-td" style={TD}>{r.모델명}</td>
+                      <td className="table-td" style={TD}>
+                        <div>{r.모델명}</div>
+                        <div style={{ fontSize: 10, color: "#64748b", marginTop: 2 }}>{r.제품코드}</div>
+                      </td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
                       <td className="table-td" style={{ ...TD, whiteSpace: "normal", wordBreak: "keep-all", minWidth: "100px", fontSize: 11 }}>{r.비고}</td>
                     </tr>
                   ))}
-                  {filteredProd.length === 0 && <tr><td colSpan="6" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>데이터가 없습니다.</td></tr>}
+                  {filteredProd.length === 0 && <tr><td colSpan="6" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>{search ? "검색 결과가 없습니다." : "데이터가 없습니다."}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -437,7 +452,7 @@ export default function App() {
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "500px" }}>
                 <thead><tr>{["상태", "품번", "품명", "규격", "재고수량"].map(h => <th key={h} className="table-th" style={{ ...TH, textAlign: ["재고수량"].includes(h) ? "right" : "left" }}>{h}</th>)}</tr></thead>
                 <tbody>
-                  {negInvList.map((r, i) => (
+                  {filteredNegInv.map((r, i) => (
                     <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
                       <td className="table-td" style={TD}><ShipBadge status="neg" /></td>
                       <td className="table-td" style={{ ...TD, fontWeight: 700 }}>{r.품번}</td>
@@ -446,7 +461,7 @@ export default function App() {
                       <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700, color: "#ef4444" }}>{fmtN(r.재고수량)}</td>
                     </tr>
                   ))}
-                  {negInvList.length === 0 && <tr><td colSpan="5" style={{ ...TD, textAlign: "center", padding: "30px", color: "#166534", fontWeight: 700 }}>🎉 마이너스 재고가 없습니다!</td></tr>}
+                  {filteredNegInv.length === 0 && <tr><td colSpan="5" style={{ ...TD, textAlign: "center", padding: "30px", color: "#166534", fontWeight: 700 }}>{search ? "검색 결과가 없습니다." : "🎉 마이너스 재고가 없습니다!"}</td></tr>}
                 </tbody>
               </table>
             </div>
