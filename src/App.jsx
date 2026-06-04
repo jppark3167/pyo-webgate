@@ -19,8 +19,8 @@ const globalCss = `
 `;
 
 // ── 유틸리티 함수 ──────────────────────────────────────────
-const fmtD = s => s?.length >= 10 ? s.slice(5) : (s||"-");
-const fmtN = n => (typeof n === "number") ? n.toLocaleString("ko-KR") : (n??"-");
+const fmtD = s => s?.length >= 10 ? s.slice(5) : (s || "-");
+const fmtN = n => (typeof n === "number") ? n.toLocaleString("ko-KR") : (n ?? "-");
 const str = v => (v === null || v === undefined) ? "" : String(v).trim();
 const num = v => {
   if (v === null || v === undefined || v === "") return 0;
@@ -42,20 +42,39 @@ function fmtXlDate(v) {
 function parseExcelDynamic(rawArray, keyIdentifiers) {
   let headerIdx = -1;
   let headers = [];
-  for (let i = 0; i < Math.min(20, rawArray.length); i++) {
+
+  // 1. ERP 엑셀 상단의 타이틀이나 공백을 고려해 최대 30행까지 깊게 탐색
+  for (let i = 0; i < Math.min(30, rawArray.length); i++) {
     if (!rawArray[i]) continue;
     const rowStr = rawArray[i].join("").replace(/\s/g, "");
-    if (keyIdentifiers.every(k => rowStr.includes(k))) {
+
+    // 2. 다중 키워드(배열 안의 배열) 처리로 유연한 헤더 매칭 (OR 조건)
+    const isHeader = keyIdentifiers.every(k => {
+      if (Array.isArray(k)) {
+        return k.some(subKey => rowStr.includes(subKey));
+      }
+      return rowStr.includes(k);
+    });
+
+    if (isHeader) {
       headerIdx = i;
       headers = rawArray[i].map(h => str(h).replace(/\n|\r/g, ""));
       break;
     }
   }
+
   if (headerIdx === -1) return [];
+
   const data = [];
   for (let i = headerIdx + 1; i < rawArray.length; i++) {
     const row = rawArray[i];
-    if (!row || row.length === 0 || !row.some(c => c) || str(row[0]).toUpperCase() === "TOTAL") continue;
+    // 빈 행 스킵
+    if (!row || row.length === 0 || !row.some(c => c)) continue;
+
+    // 3. '총계', '합계' 등 불필요한 행 스킵
+    const firstCell = str(row[0]).toUpperCase();
+    if (firstCell.includes("TOTAL") || firstCell.includes("합계") || firstCell.includes("총계")) continue;
+
     const obj = {};
     headers.forEach((colName, idx) => { if (colName) obj[colName] = row[idx]; });
     data.push(obj);
@@ -89,24 +108,24 @@ function shipStatus(invQty, needed) {
 }
 
 const STATUS = {
-  ok:       { bg:"#dcfce7", bdr:"#86efac", txt:"#166534", label:"출하가능" },
-  shortage: { bg:"#fee2e2", bdr:"#fca5a5", txt:"#991b1b", label:"재고부족" },
-  neg:      { bg:"#fff1f2", bdr:"#fda4af", txt:"#9f1239", label:"마이너스" },
-  unknown:  { bg:"#fef9c3", bdr:"#fde047", txt:"#713f12", label:"미확인"   },
+  ok: { bg: "#dcfce7", bdr: "#86efac", txt: "#166534", label: "출하가능" },
+  shortage: { bg: "#fee2e2", bdr: "#fca5a5", txt: "#991b1b", label: "재고부족" },
+  neg: { bg: "#fff1f2", bdr: "#fda4af", txt: "#9f1239", label: "마이너스" },
+  unknown: { bg: "#fef9c3", bdr: "#fde047", txt: "#713f12", label: "미확인" },
 };
 
-const TH = {background:"#f8fafc",padding:"8px 10px",fontSize:12,color:"#475569",fontWeight:700,textAlign:"left",borderBottom:"1px solid #e2e8f0",whiteSpace:"nowrap"};
-const TD = {padding:"8px 10px",fontSize:13,color:"#374151",borderBottom:"1px solid #f1f5f9",verticalAlign:"middle",whiteSpace:"nowrap"};
+const TH = { background: "#f8fafc", padding: "8px 10px", fontSize: 12, color: "#475569", fontWeight: 700, textAlign: "left", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" };
+const TD = { padding: "8px 10px", fontSize: 13, color: "#374151", borderBottom: "1px solid #f1f5f9", verticalAlign: "middle", whiteSpace: "nowrap" };
 
-const ShipBadge = ({status}) => {
-  const s = STATUS[status]||STATUS.unknown;
-  return <span style={{background:s.bg,color:s.txt,border:`1px solid ${s.bdr}`,padding:"2px 8px",borderRadius:8,fontSize:11,fontWeight:700}}>{s.label}</span>;
+const ShipBadge = ({ status }) => {
+  const s = STATUS[status] || STATUS.unknown;
+  return <span style={{ background: s.bg, color: s.txt, border: `1px solid ${s.bdr}`, padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>{s.label}</span>;
 };
-const MatBadge = ({val=""}) => {
-  if (!val||val.includes("이상없음")) return <span style={{background:"#dcfce7",color:"#166534",padding:"2px 8px",borderRadius:8,fontSize:11,fontWeight:600}}>이상없음</span>;
-  if (val.includes("확인")) return <span style={{background:"#fef3c7",color:"#92400e",padding:"2px 8px",borderRadius:8,fontSize:11,fontWeight:600}}>확인중</span>;
-  if (val.includes("입고")) return <span style={{background:"#e0f2fe",color:"#0369a1",padding:"2px 8px",borderRadius:8,fontSize:11,fontWeight:600}}>입고예정</span>;
-  return <span style={{background:"#f3f4f6",color:"#6b7280",padding:"2px 8px",borderRadius:8,fontSize:11}}>{val.slice(0,8)}</span>;
+const MatBadge = ({ val = "" }) => {
+  if (!val || val.includes("이상없음")) return <span style={{ background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>이상없음</span>;
+  if (val.includes("확인")) return <span style={{ background: "#fef3c7", color: "#92400e", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>확인중</span>;
+  if (val.includes("입고")) return <span style={{ background: "#e0f2fe", color: "#0369a1", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 600 }}>입고예정</span>;
+  return <span style={{ background: "#f3f4f6", color: "#6b7280", padding: "2px 8px", borderRadius: 8, fontSize: 11 }}>{val.slice(0, 8)}</span>;
 };
 
 function DropZone({ label, icon, accept, onFile, loaded, fileName }) {
@@ -115,19 +134,19 @@ function DropZone({ label, icon, accept, onFile, loaded, fileName }) {
   const handle = f => { if (f) onFile(f); };
   return (
     <div
-      onDragOver={e=>{e.preventDefault();setDrag(true);}}
-      onDragLeave={()=>setDrag(false)}
-      onDrop={e=>{e.preventDefault();setDrag(false);handle(e.dataTransfer.files[0]);}}
-      onClick={()=>ref.current.click()}
+      onDragOver={e => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={e => { e.preventDefault(); setDrag(false); handle(e.dataTransfer.files[0]); }}
+      onClick={() => ref.current.click()}
       style={{
-        border:`2px dashed ${drag?"#3b82f6":loaded?"#4ade80":"#cbd5e1"}`, borderRadius:12, padding:"22px 16px",
-        textAlign:"center", cursor:"pointer", background: drag?"#eff6ff":loaded?"#f0fdf4":"#f8fafc", transition:"all .2s",
-        wordBreak:"keep-all"
+        border: `2px dashed ${drag ? "#3b82f6" : loaded ? "#4ade80" : "#cbd5e1"}`, borderRadius: 12, padding: "22px 16px",
+        textAlign: "center", cursor: "pointer", background: drag ? "#eff6ff" : loaded ? "#f0fdf4" : "#f8fafc", transition: "all .2s",
+        wordBreak: "keep-all"
       }}>
-      <input ref={ref} type="file" accept={accept} style={{display:"none"}} onChange={e=>handle(e.target.files[0])} />
-      <div style={{fontSize:28,marginBottom:6}}>{loaded?"✅":icon}</div>
-      <div style={{fontWeight:700,fontSize:13,color:loaded?"#166534":"#334155"}}>{label}</div>
-      <div style={{fontSize:11,color:loaded?"#64748b":"#94a3b8",marginTop:3,wordBreak:"break-all"}}>{fileName || "터치하여 파일 선택"}</div>
+      <input ref={ref} type="file" accept={accept} style={{ display: "none" }} onChange={e => handle(e.target.files[0])} />
+      <div style={{ fontSize: 28, marginBottom: 6 }}>{loaded ? "✅" : icon}</div>
+      <div style={{ fontWeight: 700, fontSize: 13, color: loaded ? "#166534" : "#334155" }}>{label}</div>
+      <div style={{ fontSize: 11, color: loaded ? "#64748b" : "#94a3b8", marginTop: 3, wordBreak: "break-all" }}>{fileName || "터치하여 파일 선택"}</div>
     </div>
   );
 }
@@ -137,21 +156,21 @@ const loadData = (key) => {
   try {
     const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : [];
-  } catch(e) { return []; }
+  } catch (e) { return []; }
 };
 
 export default function App() {
   const [prodData, setProdData] = useState(() => loadData('wg_prod'));
   const [invData, setInvData] = useState(() => loadData('wg_inv'));
   const [shipData, setShipData] = useState(() => loadData('wg_ship'));
-  
+
   const [prodFile, setProdFile] = useState(localStorage.getItem('wg_prodFile') || "");
   const [invFile, setInvFile] = useState(localStorage.getItem('wg_invFile') || "");
 
   const [view, setView] = useState("dash");
   const [shipText, setShipText] = useState("");
   const [parseMsg, setParseMsg] = useState(null);
-  
+
   const [mainTab, setMainTab] = useState("prod");
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
@@ -168,7 +187,7 @@ export default function App() {
 
   // 데이터 전체 초기화
   const handleResetData = () => {
-    if(window.confirm("모든 데이터를 초기화하시겠습니까?")) {
+    if (window.confirm("모든 데이터를 초기화하시겠습니까?")) {
       setProdData([]); setInvData([]); setShipData([]);
       setProdFile(""); setInvFile(""); setShipText("");
       setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
@@ -180,9 +199,9 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const wb = XLSX.read(e.target.result, {type:"array", cellDates:true});
+        const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
         const parsed = parseExcelDynamic(raw, ["생산계획", "모델", "수량"]);
         const mapped = parsed.map(r => ({
           생산계획일자: fmtXlDate(r["생산계획일자"] || r["생산일"]),
@@ -196,7 +215,7 @@ export default function App() {
 
         if (mapped.length > 0) { setProdData(mapped); setParseMsg(`✅ 생산계획 ${mapped.length}건 로드 완료`); }
         else { setParseMsg("⚠️ 생산계획 데이터를 찾을 수 없습니다."); }
-      } catch(err) { setParseMsg("❌ 생산계획 파싱 오류: " + err.message); }
+      } catch (err) { setParseMsg("❌ 생산계획 파싱 오류: " + err.message); }
     };
     reader.readAsArrayBuffer(file);
   }, []);
@@ -206,19 +225,65 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = e => {
       try {
-        const wb = XLSX.read(e.target.result, {type:"array"});
+        const wb = XLSX.read(e.target.result, { type: "array" });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, {header:1, defval:""});
-        const parsed = parseExcelDynamic(raw, ["품번", "재고수량"]);
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+        // 💡 핵심: '품번'과 '재고수량'을 의미하는 다양한 텍스트를 모두 허용
+        const parsed = parseExcelDynamic(raw, [
+          ["품번", "품목코드", "품목번호", "제품코드", "ITEM_CODE"],
+          ["재고수량", "현재고", "수량", "재고", "실재고"]
+        ]);
+
         const mapped = parsed.map(r => ({
-          품번: str(r["품번"] || r["ITEM_CODE"]), 품명: str(r["품명"] || r["ITEM_NAME"]),
-          규격: str(r["규격"] || r["SPEC"]), 재고수량: num(r["재고수량"] || r["수량"]),
-          품목분류1: str(r["품목분류1"] || r["품목분류"])
+          품번: str(r["품번"] || r["품목코드"] || r["품목번호"] || r["제품코드"] || r["ITEM_CODE"]),
+          품명: str(r["품명"] || r["품목명"] || r["ITEM_NAME"] || r["제품명"]),
+          규격: str(r["규격"] || r["SPEC"] || r["스펙"]),
+          재고수량: num(r["재고수량"] || r["현재고"] || r["수량"] || r["재고"] || r["실재고"]),
+          품목분류1: str(r["품목분류1"] || r["품목분류"] || r["분류"])
         })).filter(r => r.품번);
 
         if (mapped.length > 0) { setInvData(mapped); setParseMsg(`✅ 재고현황 ${mapped.length}품목 로드 완료`); }
-        else { setParseMsg("⚠️ 재고현황 데이터를 찾을 수 없습니다."); }
-      } catch(err) { setParseMsg("❌ 재고현황 파싱 오류: " + err.message); }
+        else { setParseMsg("⚠️ 재고현황 데이터를 찾을 수 없습니다. (헤더명 불일치)"); }
+      } catch (err) { setParseMsg("❌ 재고현황 파싱 오류: " + err.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  }, []);
+
+  const handleProdFile = useCallback(file => {
+    setProdFile(file.name);
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+        // 💡 생산계획 엑셀의 다양한 양식 지원
+        const parsed = parseExcelDynamic(raw, [
+          ["생산", "계획", "출하"],
+          ["모델", "품명", "제품코드", "품번"],
+          ["수량", "계획수량"]
+        ]);
+
+        const mapped = parsed.map(r => ({
+          생산계획일자: fmtXlDate(r["생산계획일자"] || r["생산일"] || r["계획일"]),
+          출하일자: fmtXlDate(r["출하일자"] || r["출하일"] || r["납기일"]),
+          고객명: str(r["고객명"] || r["고객"] || r["거래처"]),
+          제조지시서번호: str(r["제조지시서번호"] || r["지시서번호"] || r["지시번호"]),
+          수량: num(r["수량"] || r["계획수량"]),
+          모델명: str(r["모델명"] || r["모델"] || r["품명"]),
+          제품코드: str(r["제품코드"] || r["품번"] || r["품목코드"]),
+          규격: str(r["규격"] || r["스펙"] || r["SPEC"]),
+          향지: str(r["향지"]),
+          FW버전: str(r["FW버전"] || r["펌웨어"]),
+          자재현황: str(r["자재현황"] || r["자재"]),
+          비고: str(r["비고"] || r["NOTE"])
+        })).filter(r => r.고객명 && r.수량 > 0);
+
+        if (mapped.length > 0) { setProdData(mapped); setParseMsg(`✅ 생산계획 ${mapped.length}건 로드 완료`); }
+        else { setParseMsg("⚠️ 생산계획 데이터를 찾을 수 없습니다."); }
+      } catch (err) { setParseMsg("❌ 생산계획 파싱 오류: " + err.message); }
     };
     reader.readAsArrayBuffer(file);
   }, []);
@@ -242,16 +307,16 @@ export default function App() {
 
   const prodEnriched = useMemo(() => prodData.map(r => {
     const inv = findInv(invData, r.제품코드, r.모델명);
-    return { ...r, _inv:inv, _status: shipStatus(inv?.재고수량??null, r.수량) };
+    return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
   }), [prodData, invData]);
 
   const shipEnriched = useMemo(() => shipData.map(r => {
-    const inv = findInv(invData, r.품목번호||r.품목명, r.품목명);
-    return { ...r, _inv:inv, _status: shipStatus(inv?.재고수량??null, r.수량) };
+    const inv = findInv(invData, r.품목번호 || r.품목명, r.품목명);
+    return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
   }), [shipData, invData]);
 
   const prodStats = useMemo(() => {
-    const c = {ok:0, shortage:0, neg:0, unknown:0};
+    const c = { ok: 0, shortage: 0, neg: 0, unknown: 0 };
     prodEnriched.forEach(r => c[r._status]++);
     return c;
   }, [prodEnriched]);
@@ -269,41 +334,41 @@ export default function App() {
   const negInvList = useMemo(() => invData.filter(r => r.재고수량 < 0), [invData]);
 
   const InputView = () => (
-    <div className="page-container" style={{maxWidth:860, margin:"0 auto", padding:"20px 16px"}}>
-      <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:10}}>
-        <div style={{display:"flex", alignItems:"center", gap:10}}>
-          <button className="header-btn" onClick={()=>setView("dash")} style={{background:"#1e3a5f", color:"#fff", border:"none", borderRadius:8, padding:"7px 16px", cursor:"pointer", fontSize:13, fontWeight:600}}>← 대시보드로</button>
-          <h2 style={{margin:0, fontSize:16, fontWeight:700, color:"#1e293b"}}>데이터 입력</h2>
+    <div className="page-container" style={{ maxWidth: 860, margin: "0 auto", padding: "20px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button className="header-btn" onClick={() => setView("dash")} style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>← 대시보드로</button>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1e293b" }}>데이터 입력</h2>
         </div>
-        <button className="header-btn" onClick={handleResetData} style={{background:"#ef4444", color:"#fff", border:"none", borderRadius:8, padding:"7px 16px", cursor:"pointer", fontSize:13, fontWeight:600}}>🗑️ 전체 초기화</button>
+        <button className="header-btn" onClick={handleResetData} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 8, padding: "7px 16px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>🗑️ 전체 초기화</button>
       </div>
 
       {parseMsg && (
-        <div style={{background: parseMsg.startsWith("✅")?"#f0fdf4":parseMsg.startsWith("⚠️")?"#fefce8":"#fef2f2", border:`1px solid ${parseMsg.startsWith("✅")?"#bbf7d0":parseMsg.startsWith("⚠️")?"#fde68a":"#fecaca"}`, borderRadius:8, padding:"10px 14px", marginBottom:16, fontSize:13, fontWeight:600, color: parseMsg.startsWith("✅")?"#166534":parseMsg.startsWith("⚠️")?"#713f12":"#991b1b", wordBreak:"keep-all"}}>
+        <div style={{ background: parseMsg.startsWith("✅") ? "#f0fdf4" : parseMsg.startsWith("⚠️") ? "#fefce8" : "#fef2f2", border: `1px solid ${parseMsg.startsWith("✅") ? "#bbf7d0" : parseMsg.startsWith("⚠️") ? "#fde68a" : "#fecaca"}`, borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, fontWeight: 600, color: parseMsg.startsWith("✅") ? "#166534" : parseMsg.startsWith("⚠️") ? "#713f12" : "#991b1b", wordBreak: "keep-all" }}>
           {parseMsg}
         </div>
       )}
 
-      <div style={{display:"flex", flexDirection:"column", gap:14, marginBottom:14}}>
-        <div style={{background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, padding:"18px 20px"}}>
-          <div style={{fontWeight:700, fontSize:14, marginBottom:10}}>📋 생산계획 파일</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 14 }}>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>📋 생산계획 파일</div>
           <DropZone label="생산계획 업로드" icon="📋" accept=".xlsx,.xls,.csv" onFile={handleProdFile} loaded={prodData.length > 0} fileName={prodFile} />
         </div>
-        <div style={{background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, padding:"18px 20px"}}>
-          <div style={{fontWeight:700, fontSize:14, marginBottom:10}}>🏭 재고현황 파일</div>
+        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>🏭 재고현황 파일</div>
           <DropZone label="재고현황 업로드" icon="🏭" accept=".xlsx,.xls,.csv" onFile={handleInvFile} loaded={invData.length > 0} fileName={invFile} />
         </div>
       </div>
 
-      <div style={{background:"#fff", border:"1px solid #e2e8f0", borderRadius:12, padding:"18px 20px"}}>
-        <div style={{fontWeight:700, fontSize:14, marginBottom:6}}>🚚 출하의뢰현황 (ERP 텍스트 붙여넣기)</div>
+      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "18px 20px" }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🚚 출하의뢰현황 (ERP 텍스트 붙여넣기)</div>
         <textarea
-          value={shipText} onChange={e=>setShipText(e.target.value)}
+          value={shipText} onChange={e => setShipText(e.target.value)}
           placeholder="ERP 복사 텍스트 붙여넣기"
-          style={{width:"100%", boxSizing:"border-box", height:120, border:"1px solid #e2e8f0", borderRadius:8, padding:"10px", fontSize:11, fontFamily:"monospace", outline:"none", resize:"vertical"}}
+          style={{ width: "100%", boxSizing: "border-box", height: 120, border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px", fontSize: 11, fontFamily: "monospace", outline: "none", resize: "vertical" }}
         />
-        <div style={{marginTop:10}}>
-          <button onClick={handleShipParse} style={{background:"#1d4ed8", color:"#fff", border:"none", borderRadius:8, padding:"10px 20px", cursor:"pointer", fontSize:13, fontWeight:700, width:"100%"}}>파싱 적용</button>
+        <div style={{ marginTop: 10 }}>
+          <button onClick={handleShipParse} style={{ background: "#1d4ed8", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", cursor: "pointer", fontSize: 13, fontWeight: 700, width: "100%" }}>파싱 적용</button>
         </div>
       </div>
     </div>
@@ -311,46 +376,46 @@ export default function App() {
 
   const DashView = () => (
     <>
-      <div className="swipe-menu" style={{display:"flex", gap:8, padding:"10px 18px", background:"#fff", borderBottom:"1px solid #e2e8f0", whiteSpace:"nowrap"}}>
+      <div className="swipe-menu" style={{ display: "flex", gap: 8, padding: "10px 18px", background: "#fff", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
         {[
-          {key:"all", label:"전체", cnt:prodEnriched.length, color:"#475569"}, {key:"ok", label:"✅ 출하가능", cnt:prodStats.ok, color:"#166534"},
-          {key:"shortage", label:"❌ 재고부족", cnt:prodStats.shortage, color:"#991b1b"}, {key:"unknown", label:"⚠️ 미확인", cnt:prodStats.unknown, color:"#713f12"}
-        ].map(s=>(
-          <button key={s.key} className="stat-btn" onClick={()=>{setFilterStatus(s.key);setMainTab("prod");}} style={{flexShrink:0, background:filterStatus===s.key?STATUS[s.key]?.bg||"#f1f5f9":"#f8fafc", border:`1.5px solid ${filterStatus===s.key?s.color+"55":"#e2e8f0"}`, borderRadius:8, padding:"6px 13px", cursor:"pointer", fontSize:12, fontWeight:filterStatus===s.key?700:400, color:filterStatus===s.key?s.color:"#64748b"}}>
-            {s.label} <strong style={{marginLeft:2}}>{s.cnt}</strong>
+          { key: "all", label: "전체", cnt: prodEnriched.length, color: "#475569" }, { key: "ok", label: "✅ 출하가능", cnt: prodStats.ok, color: "#166534" },
+          { key: "shortage", label: "❌ 재고부족", cnt: prodStats.shortage, color: "#991b1b" }, { key: "unknown", label: "⚠️ 미확인", cnt: prodStats.unknown, color: "#713f12" }
+        ].map(s => (
+          <button key={s.key} className="stat-btn" onClick={() => { setFilterStatus(s.key); setMainTab("prod"); }} style={{ flexShrink: 0, background: filterStatus === s.key ? STATUS[s.key]?.bg || "#f1f5f9" : "#f8fafc", border: `1.5px solid ${filterStatus === s.key ? s.color + "55" : "#e2e8f0"}`, borderRadius: 8, padding: "6px 13px", cursor: "pointer", fontSize: 12, fontWeight: filterStatus === s.key ? 700 : 400, color: filterStatus === s.key ? s.color : "#64748b" }}>
+            {s.label} <strong style={{ marginLeft: 2 }}>{s.cnt}</strong>
           </button>
         ))}
       </div>
 
-      <div className="swipe-menu" style={{background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"0 18px", display:"flex", alignItems:"center", gap:4, whiteSpace:"nowrap"}}>
+      <div className="swipe-menu" style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 18px", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
         {[
-          {key:"prod", label:"📋 생산계획"}, {key:"ship", label:"🚚 출하의뢰", extra: shipEnriched.filter(r=>r._status!=="ok").length},
-          {key:"inv", label:"⚠️ 마이너스재고", extra: negInvList.length}
-        ].map(t=>(
-          <button key={t.key} className="tab-btn" onClick={()=>setMainTab(t.key)} style={{flexShrink:0, padding:"12px 14px", border:"none", background:"transparent", cursor:"pointer", fontWeight:700, fontSize:13, borderBottom:mainTab===t.key?"2.5px solid #3b82f6":"2.5px solid transparent", color:mainTab===t.key?"#1d4ed8":"#94a3b8"}}>
+          { key: "prod", label: "📋 생산계획" }, { key: "ship", label: "🚚 출하의뢰", extra: shipEnriched.filter(r => r._status !== "ok").length },
+          { key: "inv", label: "⚠️ 마이너스재고", extra: negInvList.length }
+        ].map(t => (
+          <button key={t.key} className="tab-btn" onClick={() => setMainTab(t.key)} style={{ flexShrink: 0, padding: "12px 14px", border: "none", background: "transparent", cursor: "pointer", fontWeight: 700, fontSize: 13, borderBottom: mainTab === t.key ? "2.5px solid #3b82f6" : "2.5px solid transparent", color: mainTab === t.key ? "#1d4ed8" : "#94a3b8" }}>
             {t.label}
-            {t.extra > 0 && <span style={{marginLeft:5, background:t.key==="inv"?"#ef4444":"#f59e0b", color:"#fff", borderRadius:9, padding:"2px 6px", fontSize:10}}>{t.extra}</span>}
+            {t.extra > 0 && <span style={{ marginLeft: 5, background: t.key === "inv" ? "#ef4444" : "#f59e0b", color: "#fff", borderRadius: 9, padding: "2px 6px", fontSize: 10 }}>{t.extra}</span>}
           </button>
         ))}
       </div>
 
-      <div className="page-container" style={{padding:"14px 16px"}}>
+      <div className="page-container" style={{ padding: "14px 16px" }}>
         {mainTab === "prod" && (
-          <div style={{background:"#fff", borderRadius:10, border:"1px solid #e2e8f0", overflow:"hidden"}}>
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
-              <table style={{width:"100%", borderCollapse:"collapse", minWidth:"600px"}}>
-                <thead><tr>{["상태","출하일","고객명","모델명","수량","현재고","자재","비고"].map(h=><th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+                <thead><tr>{["상태", "출하일", "고객명", "모델명", "수량", "현재고", "자재", "비고"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
                 <tbody>
                   {filteredProd.map((r, i) => (
-                    <tr key={i} style={{background:i%2?"#fafafa":"#fff"}}>
-                      <td className="table-td" style={TD}><ShipBadge status={r._status}/></td>
-                      <td className="table-td" style={{...TD, fontWeight:700, color:"#1d4ed8"}}>{fmtD(r.출하일자)}</td>
-                      <td className="table-td" style={{...TD, fontWeight:600}}>{r.고객명}</td>
+                    <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
+                      <td className="table-td" style={TD}><ShipBadge status={r._status} /></td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#1d4ed8" }}>{fmtD(r.출하일자)}</td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.고객명}</td>
                       <td className="table-td" style={TD}>{r.모델명}</td>
-                      <td className="table-td" style={{...TD, textAlign:"right", fontWeight:700}}>{fmtN(r.수량)}</td>
-                      <td className="table-td" style={{...TD, textAlign:"right", fontWeight:700}}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
-                      <td className="table-td" style={TD}><MatBadge val={r.자재현황}/></td>
-                      <td className="table-td" style={{...TD, whiteSpace:"normal", wordBreak:"keep-all", minWidth:"100px", fontSize:11}}>{r.비고}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
+                      <td className="table-td" style={TD}><MatBadge val={r.자재현황} /></td>
+                      <td className="table-td" style={{ ...TD, whiteSpace: "normal", wordBreak: "keep-all", minWidth: "100px", fontSize: 11 }}>{r.비고}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -365,17 +430,17 @@ export default function App() {
   return (
     <>
       <style>{globalCss}</style>
-      <div style={{fontFamily:"'Pretendard','Malgun Gothic',sans-serif", background:"#f1f5f9", minHeight:"100vh"}}>
-        <div style={{background:"#1e3a5f", color:"#fff", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"10px"}}>
-          <div style={{display:"flex", alignItems:"center", gap:8}}>
-            <span style={{fontSize:18}}>🏭</span>
-            <div><div className="header-title" style={{fontWeight:700, fontSize:15}}>출하 일정관리</div></div>
+      <div style={{ fontFamily: "'Pretendard','Malgun Gothic',sans-serif", background: "#f1f5f9", minHeight: "100vh" }}>
+        <div style={{ background: "#1e3a5f", color: "#fff", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 18 }}>🏭</span>
+            <div><div className="header-title" style={{ fontWeight: 700, fontSize: 15 }}>출하 일정관리</div></div>
           </div>
-          <button className="header-btn" onClick={()=>{setView(view==="input"?"dash":"input");setParseMsg(null);}} style={{background:"#ffffff22", color:"#fff", border:"1px solid #ffffff44", borderRadius:8, padding:"6px 12px", cursor:"pointer", fontSize:12, fontWeight:600}}>
+          <button className="header-btn" onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }} style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
             {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
           </button>
         </div>
-        {view === "input" ? <InputView/> : <DashView/>}
+        {view === "input" ? <InputView /> : <DashView />}
       </div>
     </>
   );
