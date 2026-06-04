@@ -162,7 +162,8 @@ export default function App() {
   const [shipText, setShipText] = useState("");
   const [parseMsg, setParseMsg] = useState(null);
 
-  const [mainTab, setMainTab] = useState("prod");
+  // 💡 기본 탭을 'ship'(출하의뢰)으로 변경
+  const [mainTab, setMainTab] = useState("ship");
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -194,7 +195,6 @@ export default function App() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        // 유연한 생산계획 헤더 매칭
         const parsed = parseExcelDynamic(raw, [
           ["생산", "계획", "출하"],
           ["모델", "품명", "제품코드", "품번"],
@@ -229,7 +229,6 @@ export default function App() {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        // 유연한 재고현황 헤더 매칭
         const parsed = parseExcelDynamic(raw, [
           ["품번", "품목코드", "품목번호", "제품코드", "ITEM_CODE"],
           ["재고수량", "현재고", "수량", "재고", "실재고"]
@@ -279,9 +278,12 @@ export default function App() {
 
   const prodStats = useMemo(() => {
     const c = { ok: 0, shortage: 0, neg: 0, unknown: 0 };
-    prodEnriched.forEach(r => c[r._status]++);
+    // 현재 활성화된 탭에 맞춰 상태 통계를 보여주도록 수정 가능하지만, 일단 생산/출하의뢰 통합으로 하거나 현재 탭 기준으로 변경할 수 있습니다.
+    // 기존 로직 유지 (생산계획 기준 통계) - 원하시면 출하의뢰 통계로 변경 가능합니다.
+    const activeData = mainTab === 'ship' ? shipEnriched : prodEnriched;
+    activeData.forEach(r => c[r._status]++);
     return c;
-  }, [prodEnriched]);
+  }, [prodEnriched, shipEnriched, mainTab]);
 
   const filteredProd = useMemo(() => {
     const q = search.toLowerCase();
@@ -293,7 +295,6 @@ export default function App() {
     });
   }, [prodEnriched, search, filterDate, filterStatus]);
 
-  // 💡 출하의뢰 전용 필터 로직
   const filteredShip = useMemo(() => {
     const q = search.toLowerCase();
     return shipEnriched.filter(r => {
@@ -351,10 +352,13 @@ export default function App() {
     <>
       <div className="swipe-menu" style={{ display: "flex", gap: 8, padding: "10px 18px", background: "#fff", borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" }}>
         {[
-          { key: "all", label: "전체", cnt: prodEnriched.length, color: "#475569" }, { key: "ok", label: "✅ 출하가능", cnt: prodStats.ok, color: "#166534" },
-          { key: "shortage", label: "❌ 재고부족", cnt: prodStats.shortage, color: "#991b1b" }, { key: "unknown", label: "⚠️ 미확인", cnt: prodStats.unknown, color: "#713f12" }
+          // 상단 통계를 현재 활성화된 탭(mainTab) 기준으로 계산되도록 동적 적용
+          { key: "all", label: "전체", cnt: mainTab === 'ship' ? shipEnriched.length : prodEnriched.length, color: "#475569" },
+          { key: "ok", label: "✅ 출하가능", cnt: prodStats.ok, color: "#166534" },
+          { key: "shortage", label: "❌ 재고부족", cnt: prodStats.shortage, color: "#991b1b" },
+          { key: "unknown", label: "⚠️ 미확인", cnt: prodStats.unknown, color: "#713f12" }
         ].map(s => (
-          <button key={s.key} className="stat-btn" onClick={() => { setFilterStatus(s.key); setMainTab("prod"); }} style={{ flexShrink: 0, background: filterStatus === s.key ? STATUS[s.key]?.bg || "#f1f5f9" : "#f8fafc", border: `1.5px solid ${filterStatus === s.key ? s.color + "55" : "#e2e8f0"}`, borderRadius: 8, padding: "6px 13px", cursor: "pointer", fontSize: 12, fontWeight: filterStatus === s.key ? 700 : 400, color: filterStatus === s.key ? s.color : "#64748b" }}>
+          <button key={s.key} className="stat-btn" onClick={() => { setFilterStatus(s.key); }} style={{ flexShrink: 0, background: filterStatus === s.key ? STATUS[s.key]?.bg || "#f1f5f9" : "#f8fafc", border: `1.5px solid ${filterStatus === s.key ? s.color + "55" : "#e2e8f0"}`, borderRadius: 8, padding: "6px 13px", cursor: "pointer", fontSize: 12, fontWeight: filterStatus === s.key ? 700 : 400, color: filterStatus === s.key ? s.color : "#64748b" }}>
             {s.label} <strong style={{ marginLeft: 2 }}>{s.cnt}</strong>
           </button>
         ))}
@@ -362,7 +366,9 @@ export default function App() {
 
       <div className="swipe-menu" style={{ background: "#fff", borderBottom: "1px solid #e2e8f0", padding: "0 18px", display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap" }}>
         {[
-          { key: "prod", label: "📋 생산계획" }, { key: "ship", label: "🚚 출하의뢰", extra: shipEnriched.filter(r => r._status !== "ok").length },
+          // 💡 배열 순서를 변경하여 화면에 '출하의뢰'가 먼저 나타나도록 수정
+          { key: "ship", label: "🚚 출하의뢰", extra: shipEnriched.filter(r => r._status !== "ok").length },
+          { key: "prod", label: "📋 생산계획" },
           { key: "inv", label: "⚠️ 마이너스재고", extra: negInvList.length }
         ].map(t => (
           <button key={t.key} className="tab-btn" onClick={() => setMainTab(t.key)} style={{ flexShrink: 0, padding: "12px 14px", border: "none", background: "transparent", cursor: "pointer", fontWeight: 700, fontSize: 13, borderBottom: mainTab === t.key ? "2.5px solid #3b82f6" : "2.5px solid transparent", color: mainTab === t.key ? "#1d4ed8" : "#94a3b8" }}>
@@ -374,32 +380,7 @@ export default function App() {
 
       <div className="page-container" style={{ padding: "14px 16px" }}>
 
-        {/* 1. 생산계획 탭 (자재 열 제거됨) */}
-        {mainTab === "prod" && (
-          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-            <div className="swipe-menu">
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
-                <thead><tr>{["상태", "출하일", "고객명", "모델명", "수량", "현재고", "비고"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
-                <tbody>
-                  {filteredProd.map((r, i) => (
-                    <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
-                      <td className="table-td" style={TD}><ShipBadge status={r._status} /></td>
-                      <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#1d4ed8" }}>{fmtD(r.출하일자)}</td>
-                      <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.고객명}</td>
-                      <td className="table-td" style={TD}>{r.모델명}</td>
-                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
-                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
-                      <td className="table-td" style={{ ...TD, whiteSpace: "normal", wordBreak: "keep-all", minWidth: "100px", fontSize: 11 }}>{r.비고}</td>
-                    </tr>
-                  ))}
-                  {filteredProd.length === 0 && <tr><td colSpan="7" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>데이터가 없습니다.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* 2. 출하의뢰 탭 (신규 추가) */}
+        {/* 1. 출하의뢰 탭 */}
         {mainTab === "ship" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
@@ -430,7 +411,32 @@ export default function App() {
           </div>
         )}
 
-        {/* 3. 마이너스 재고 탭 (보너스 구현) */}
+        {/* 2. 생산계획 탭 */}
+        {mainTab === "prod" && (
+          <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
+            <div className="swipe-menu">
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
+                <thead><tr>{["상태", "출하일", "고객명", "모델명", "수량", "현재고", "비고"].map(h => <th key={h} className="table-th" style={TH}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {filteredProd.map((r, i) => (
+                    <tr key={i} style={{ background: i % 2 ? "#fafafa" : "#fff" }}>
+                      <td className="table-td" style={TD}><ShipBadge status={r._status} /></td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 700, color: "#1d4ed8" }}>{fmtD(r.출하일자)}</td>
+                      <td className="table-td" style={{ ...TD, fontWeight: 600 }}>{r.고객명}</td>
+                      <td className="table-td" style={TD}>{r.모델명}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{fmtN(r.수량)}</td>
+                      <td className="table-td" style={{ ...TD, textAlign: "right", fontWeight: 700 }}>{r._inv ? fmtN(r._inv.재고수량) : "—"}</td>
+                      <td className="table-td" style={{ ...TD, whiteSpace: "normal", wordBreak: "keep-all", minWidth: "100px", fontSize: 11 }}>{r.비고}</td>
+                    </tr>
+                  ))}
+                  {filteredProd.length === 0 && <tr><td colSpan="7" style={{ ...TD, textAlign: "center", padding: "30px", color: "#94a3b8" }}>데이터가 없습니다.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* 3. 마이너스 재고 탭 */}
         {mainTab === "inv" && (
           <div style={{ background: "#fff", borderRadius: 10, border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div className="swipe-menu">
