@@ -15,7 +15,7 @@ export default function App() {
   const [shipText, setShipText] = useState("");
   const [parseMsg, setParseMsg] = useState(null);
 
-  const [mainTab, setMainTab] = useState("ship_dom"); // 기본 탭을 국내 출하의뢰로 설정
+  const [mainTab, setMainTab] = useState("ship_dom");
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -115,9 +115,9 @@ export default function App() {
     return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
   }), [shipData, invData]);
 
-  // 💡 핵심: 품목번호 끝자리가 'DO'면 국내(Dom), 아니면 해외(Ovs)로 완벽 분리
-  const shipDomEnriched = useMemo(() => shipEnriched.filter(r => str(r.품목번호).toUpperCase().endsWith('DO')), [shipEnriched]);
-  const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => !str(r.품목번호).toUpperCase().endsWith('DO')), [shipEnriched]);
+  // 💡 핵심 변경: 담당자 이름이 "이우제" 또는 "김윤식"이면 해외(Ovs), 그 외는 국내(Dom)
+  const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => ["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
+  const shipDomEnriched = useMemo(() => shipEnriched.filter(r => !["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
 
   const prodEnriched = useMemo(() => prodData.map(r => {
     const inv = findInv(invData, r.제품코드);
