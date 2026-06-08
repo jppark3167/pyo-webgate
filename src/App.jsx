@@ -36,16 +36,17 @@ export default function App() {
       setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
     }
   };
-  const handleProdFile = useCallback(file => {
+const handleProdFile = useCallback(file => {
     setProdFile(file.name);
     const reader = new FileReader();
-
+    
     reader.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-
-        // 헤더를 첫 번째 행으로 간주
+        // '6월 생산계획' 등 첫 번째 시트를 가져옵니다.
+        const ws = wb.Sheets[wb.SheetNames[0]]; 
+        
+        // 일단 전체를 배열로 가져옵니다.
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
         if (raw.length < 2) {
@@ -53,23 +54,43 @@ export default function App() {
           return;
         }
 
-        // 1. 헤더 인덱스 매핑 (공백 제거 후 정확히 매칭)
-        const headers = raw[0].map(h => h ? String(h).trim() : "");
+        // 1. 실제 헤더 행 동적 탐색 (상단 타이틀/빈 행 무시)
+        let headerRowIdx = -1;
+        let headers = [];
+        
+        // 상위 20행 이내에서 '제품코드'나 '고객명'이 있는 행을 찾습니다.
+        for (let i = 0; i < Math.min(20, raw.length); i++) {
+          // 띄어쓰기, 줄바꿈을 모두 제거하여 정확도를 높입니다. (예: "생산계획 일자" -> "생산계획일자")
+          const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : ""); 
+          
+          if (currentRow.includes("제품코드") || currentRow.includes("생산계획일자")) {
+            headerRowIdx = i;
+            headers = currentRow;
+            break;
+          }
+        }
+
+        if (headerRowIdx === -1) {
+          setParseMsg("❌ 필수 헤더(생산계획 일자, 제품코드 등)를 찾을 수 없습니다. 엑셀 양식을 확인해주세요.");
+          return;
+        }
+
+        // 2. 인덱스 매핑 (공백이 제거된 상태로 매칭)
         const idx = {
-          planDate: headers.indexOf("생산계획 일자"),
-          shipDate: headers.indexOf("출하일자"),
-          customer: headers.indexOf("고객명"),
-          qty: headers.indexOf("수량"),
-          modelName: headers.indexOf("모델명"),
-          prodCode: headers.indexOf("제품코드")
+          planDate: headers.findIndex(h => h.includes("생산계획일자")),
+          shipDate: headers.findIndex(h => h.includes("출하일자")),
+          customer: headers.findIndex(h => h.includes("고객명")),
+          qty: headers.findIndex(h => h.includes("수량")),
+          modelName: headers.findIndex(h => h.includes("모델명")),
+          prodCode: headers.findIndex(h => h.includes("제품코드"))
         };
 
-        // 2. 기준일 설정 (현재 시간: 2026년 6월 8일 00시 00분)
+        // 3. 기준일 설정 (현재: 2026년 6월 8일 00시 00분)
         const today = new Date("2026-06-08");
         today.setHours(0, 0, 0, 0);
 
-        // 3. 데이터 파싱 및 필터링
-        const parsedData = raw.slice(1)
+        // 4. 데이터 파싱 및 필터링 (찾아낸 헤더 행의 바로 다음 행부터 시작)
+        const parsedData = raw.slice(headerRowIdx + 1)
           .map(row => ({
             생산계획일자: idx.planDate !== -1 ? fmtXlDate(row[idx.planDate]) : "",
             출하일자: idx.shipDate !== -1 ? fmtXlDate(row[idx.shipDate]) : "",
@@ -79,22 +100,21 @@ export default function App() {
             제품코드: idx.prodCode !== -1 ? str(row[idx.prodCode]) : ""
           }))
           .filter(item => {
-            // 제품코드가 없는 빈 행은 제외
+            // 제품코드가 없는 행(빈 줄, 합계 줄 등)은 제외
             if (!item.제품코드) return false;
 
-            // 💡 핵심 변경: '생산계획일자' 기준으로 과거 데이터 제외
+            // '생산계획일자' 기준으로 오늘(26.06.08) 이전 데이터 제외
             if (item.생산계획일자) {
               const itemDate = new Date(item.생산계획일자);
               if (itemDate < today) return false;
             } else {
-              // 생산계획 일자가 아예 비어있는 경우도 파싱에서 제외 (필요시 true로 변경)
+              // 날짜가 누락된 경우도 무시
               return false;
             }
 
             return true;
           });
 
-        // 상태 업데이트
         setProdData(parsedData);
         setParseMsg(`✅ 생산계획 ${parsedData.length}건이 성공적으로 로드되었습니다.`);
 
