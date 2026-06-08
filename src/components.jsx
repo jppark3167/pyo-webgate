@@ -61,24 +61,72 @@ export function InputView({
 }) {
     return (
         <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
+
+            {/* 헤더 및 전체 초기화 버튼 */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
                 <h2 style={{ fontSize: "18px", fontWeight: "700", color: "#334155", margin: 0 }}>📂 데이터 입력 및 설정</h2>
-                <button onClick={handleResetData} style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>
+                <button
+                    onClick={handleResetData}
+                    style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: "6px", padding: "6px 12px", fontSize: "13px", fontWeight: "600", cursor: "pointer" }}
+                >
                     데이터 전체 초기화
                 </button>
             </div>
 
-            {/* 데이터 업로드 설정 영역 (기존 로직 유지) */}
+            {/* 1. 생산 계획 데이터 업로드 */}
             <div style={{ background: "#fff", padding: "16px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: "16px" }}>
-                <p style={{ margin: "0 0 8px 0", fontWeight: "600" }}>출하의뢰 텍스트 붙여넣기 (엑셀 복사)</p>
+                <h3 style={{ fontSize: "15px", marginTop: 0, marginBottom: "12px", color: "#1e3a5f" }}>🏭 생산 데이터 업로드 (Excel)</h3>
+                <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => {
+                        if (e.target.files[0]) handleProdFile(e.target.files[0]);
+                    }}
+                />
+                {prodFile && (
+                    <p style={{ fontSize: "12px", color: "#166534", marginTop: "8px", fontWeight: "600" }}>
+                        ✅ 현재 적용된 파일: {prodFile} (총 {prodData?.length || 0}건)
+                    </p>
+                )}
+            </div>
+
+            {/* 2. 재고 데이터 업로드 */}
+            <div style={{ background: "#fff", padding: "16px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", marginBottom: "16px" }}>
+                <h3 style={{ fontSize: "15px", marginTop: 0, marginBottom: "12px", color: "#1e3a5f" }}>📦 재고 데이터 업로드 (Excel)</h3>
+                <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={(e) => {
+                        if (e.target.files[0]) handleInvFile(e.target.files[0]);
+                    }}
+                />
+                {invFile && (
+                    <p style={{ fontSize: "12px", color: "#166534", marginTop: "8px", fontWeight: "600" }}>
+                        ✅ 현재 적용된 파일: {invFile} (총 {invData?.length || 0}건)
+                    </p>
+                )}
+            </div>
+
+            {/* 3. 출하 의뢰 텍스트 입력 */}
+            <div style={{ background: "#fff", padding: "16px", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                <h3 style={{ fontSize: "15px", marginTop: 0, marginBottom: "12px", color: "#1e3a5f" }}>🚚 출하 의뢰 텍스트 붙여넣기</h3>
                 <textarea
                     value={shipText}
                     onChange={(e) => setShipText(e.target.value)}
-                    placeholder="여기에 엑셀 데이터를 붙여넣으세요..."
-                    style={{ width: "100%", height: "120px", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", marginBottom: "8px", fontFamily: "monospace", fontSize: "12px", boxSizing: "border-box" }}
+                    placeholder="ERP 등에서 복사한 출하 의뢰 텍스트 데이터를 이곳에 붙여넣으세요..."
+                    style={{ width: "100%", height: "120px", padding: "10px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "13px", boxSizing: "border-box", fontFamily: "inherit" }}
                 />
-                <button onClick={handleShipParse} style={{ background: "#1e3a5f", color: "#fff", padding: "8px 16px", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: "600" }}>데이터 파싱하기</button>
-                {parseMsg && <p style={{ fontSize: "12px", color: "#b91c1c", marginTop: "8px", fontWeight: "600" }}>{parseMsg}</p>}
+                <button
+                    onClick={handleShipParse}
+                    style={{ background: "#1e3a5f", color: "#fff", border: "none", borderRadius: "6px", padding: "10px 16px", fontSize: "13px", fontWeight: "600", cursor: "pointer", marginTop: "10px", width: "100%" }}
+                >
+                    데이터 파싱 및 출하 목록 적용
+                </button>
+                {parseMsg && (
+                    <p style={{ fontSize: "13px", color: parseMsg.includes("✅") ? "#166534" : "#b91c1c", marginTop: "10px", fontWeight: "600" }}>
+                        {parseMsg}
+                    </p>
+                )}
             </div>
         </div>
     );
