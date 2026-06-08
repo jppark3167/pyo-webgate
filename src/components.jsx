@@ -139,6 +139,8 @@ export function DashView({
                                     <th style={thStyle}>품목명 / 규격</th>
                                     <th style={thStyle}>의뢰수량</th>
                                     <th style={thStyle}>현재고</th>
+                                    <th style={thStyle}>생산예정</th> {/* ✨ 추가됨 */}
+                                    <th style={thStyle}>예상재고</th> {/* ✨ 추가됨 */}
                                     <th style={thStyle}>상태</th>
                                     <th style={thStyle}>의뢰번호</th>
                                     <th style={thStyle}>담당</th>
@@ -166,7 +168,6 @@ export function DashView({
                                         <td style={tdStyle}>{item.납기일자}</td>
                                         <td style={tdStyle}>{item.거래처명}</td>
 
-                                        {/* 품목명/규격은 내용이 길 수 있으므로 줄바꿈 허용 (whiteSpace: normal) */}
                                         <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "normal" }}>
                                             <div style={{ fontWeight: "600" }}>{item.품목명}</div>
                                             <div style={{ fontSize: "11px", color: "#64748b", marginTop: "4px" }}>{item.규격} ({item.품목번호})</div>
@@ -174,15 +175,19 @@ export function DashView({
 
                                         <td style={{ ...tdStyle, fontWeight: "600" }}>{item.수량}</td>
 
-                                        {/* ✨ 생산계획 연동 '가용 재고(ATP)' 동적 렌더링 로직 적용 */}
+                                        {/* 1. 순수 현재고 */}
                                         <td style={tdStyle}>
-                                            {item._incomingProd > 0 ? (
-                                                <span style={{ fontWeight: 600, color: "#2563eb" }}>
-                                                    {item._projectedInvQty} (+{item._incomingProd})
-                                                </span>
-                                            ) : (
-                                                <span>{item._projectedInvQty ?? item._currentInvQty ?? (item._inv?.재고수량 ?? 0)}</span>
-                                            )}
+                                            {item._currentInvQty}
+                                        </td>
+
+                                        {/* 2. 생산 예정 (있을 경우 파란색 강조) */}
+                                        <td style={{ ...tdStyle, color: item._incomingProd > 0 ? "#2563eb" : "#94a3b8" }}>
+                                            {item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
+                                        </td>
+
+                                        {/* 3. 최종 예상 재고 (음수면 빨간색, 양수면 짙은 회색) */}
+                                        <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
+                                            {item._projectedInvQty}
                                         </td>
 
                                         <td style={tdStyle}>{renderStatusBadge(item._status)}</td>

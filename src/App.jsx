@@ -160,7 +160,7 @@ export default function App() {
     // 1. 납기일자 오름차순 정렬 (먼저 출하되는 건부터 순차 차감하기 위함)
     const sortedShip = [...shipData].sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
 
-    // 2. 품목별로 '이전 출하건에서 이미 사용한(차감된) 재고 및 생산량'을 추적하는 객체
+    // 2. 품목별로 '이전 출하건에서 이미 사용한(차감된) 재고'를 추적하는 객체
     const consumedQty = {};
 
     return sortedShip.map(r => {
@@ -178,8 +178,7 @@ export default function App() {
       // 누적 차감량 초기화
       if (consumedQty[code] === undefined) consumedQty[code] = 0;
 
-      // 5. 현재 주문 처리 직전의 실질 가용 재고(ATP) 
-      // 계산식: (순수 현재고 + 누적 생산량) - 이전 출하건들의 누적 차감량
+      // 5. 예상재고 (순수 현재고 + 생산예정 - 이전 출하건들의 누적 차감량)
       const projectedInvQty = currentInvQty + totalIncomingProd - consumedQty[code];
 
       // 6. 다음 출하건 계산을 위해, 현재 의뢰수량만큼 누적 차감량에 추가
@@ -188,13 +187,13 @@ export default function App() {
       return {
         ...r,
         _inv: inv,
-        _currentInvQty: currentInvQty,
-        _incomingProd: totalIncomingProd, // 납기일 기준 누적 생산 예정량
-        _projectedInvQty: projectedInvQty, // 화면에 표시될 찐 가용 재고
-        _status: shipStatus(projectedInvQty, num(r.수량)) // 가용 재고 기준으로 상태 판별
+        _currentInvQty: currentInvQty,     // 컬럼 1: 현재고
+        _incomingProd: totalIncomingProd,  // 컬럼 2: 생산예정
+        _projectedInvQty: projectedInvQty, // 컬럼 3: 예상재고
+        _status: shipStatus(projectedInvQty, num(r.수량)) // 예상재고 기준으로 상태 판별
       };
     });
-  }, [shipData, invData, prodData]); // ✨ 의존성 배열에 prodData가 반드시 포함되어야 합니다.
+  }, [shipData, invData, prodData]);
 
   const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => ["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
   const shipDomEnriched = useMemo(() => shipEnriched.filter(r => !["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
