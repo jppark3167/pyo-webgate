@@ -36,7 +36,6 @@ export default function App() {
       setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
     }
   };
-
   const handleProdFile = useCallback(file => {
     setProdFile(file.name);
     const reader = new FileReader();
@@ -46,7 +45,7 @@ export default function App() {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
 
-        // 헤더를 첫 번째 행으로 간주하여 배열 형태로 가져옵니다.
+        // 헤더를 첫 번째 행으로 간주
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
         if (raw.length < 2) {
@@ -54,7 +53,7 @@ export default function App() {
           return;
         }
 
-        // 1. 동적 헤더 인덱스 매핑 (열 순서가 변경되어도 대응 가능)
+        // 1. 헤더 인덱스 매핑 (공백 제거 후 정확히 매칭)
         const headers = raw[0].map(h => h ? String(h).trim() : "");
         const idx = {
           planDate: headers.indexOf("생산계획 일자"),
@@ -65,14 +64,14 @@ export default function App() {
           prodCode: headers.indexOf("제품코드")
         };
 
-        // 2. 기준일 설정 (현재 시간: 2026년 6월 8일)
+        // 2. 기준일 설정 (현재 시간: 2026년 6월 8일 00시 00분)
         const today = new Date("2026-06-08");
         today.setHours(0, 0, 0, 0);
 
         // 3. 데이터 파싱 및 필터링
         const parsedData = raw.slice(1)
           .map(row => ({
-            생산계획일자: idx.planDate !== -1 ? fmtXlDate(row[idx.planDate]) : "", // 기존 utils 활용 
+            생산계획일자: idx.planDate !== -1 ? fmtXlDate(row[idx.planDate]) : "",
             출하일자: idx.shipDate !== -1 ? fmtXlDate(row[idx.shipDate]) : "",
             고객명: idx.customer !== -1 ? str(row[idx.customer]) : "",
             수량: idx.qty !== -1 ? num(row[idx.qty]) : 0,
@@ -80,19 +79,22 @@ export default function App() {
             제품코드: idx.prodCode !== -1 ? str(row[idx.prodCode]) : ""
           }))
           .filter(item => {
-            // 빈 행 및 필수 값(제품코드) 누락 데이터 제거
+            // 제품코드가 없는 빈 행은 제외
             if (!item.제품코드) return false;
 
-            // 출하일자 기준 과거 데이터 필터링 (오늘 이전 데이터는 무시)
-            if (item.출하일자) {
-              const itemDate = new Date(item.출하일자);
+            // 💡 핵심 변경: '생산계획일자' 기준으로 과거 데이터 제외
+            if (item.생산계획일자) {
+              const itemDate = new Date(item.생산계획일자);
               if (itemDate < today) return false;
+            } else {
+              // 생산계획 일자가 아예 비어있는 경우도 파싱에서 제외 (필요시 true로 변경)
+              return false;
             }
 
             return true;
           });
 
-        // 상태 업데이트 [cite: 3]
+        // 상태 업데이트
         setProdData(parsedData);
         setParseMsg(`✅ 생산계획 ${parsedData.length}건이 성공적으로 로드되었습니다.`);
 
