@@ -20,7 +20,7 @@ export default function App() {
   const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortDesc, setSortDesc] = useState(false);
-
+  //임시 커밋용
   useEffect(() => {
     localStorage.setItem('wg_prod', JSON.stringify(prodData));
     localStorage.setItem('wg_inv', JSON.stringify(invData));
