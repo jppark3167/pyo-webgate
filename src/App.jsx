@@ -40,28 +40,66 @@ export default function App() {
   const handleProdFile = useCallback(file => {
     setProdFile(file.name);
     const reader = new FileReader();
+
     reader.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
+
+        // 헤더를 첫 번째 행으로 간주하여 배열 형태로 가져옵니다.
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-        const parsed = parseExcelDynamic(raw, [
-          ["생산", "계획", "출하"], ["모델", "품명", "제품코드", "품번"], ["수량", "계획수량"]
-        ]);
+        if (raw.length < 2) {
+          setParseMsg("⚠️ 데이터가 충분하지 않거나 양식이 잘못되었습니다.");
+          return;
+        }
 
-        const mapped = parsed.map(r => ({
-          생산계획일자: fmtXlDate(r["생산계획일자"] || r["생산계획일"] || r["생산일자"] || r["생산일"] || r["계획일"]),
-          출하일자: fmtXlDate(r["출하일자"] || r["출하일"] || r["납기일자"] || r["납기일"]),
-          고객명: str(r["고객명"] || r["고객"] || r["거래처"] || r["업체명"]),
-          수량: num(r["수량"] || r["계획수량"] || r["생산수량"]),
-          모델명: str(r["모델명"] || r["모델"] || r["품명"]),
-          제품코드: str(r["제품코드"] || r["품번"] || r["품목코드"] || r["ITEM_CODE"]),
-        })).filter(r => (r.고객명 || r.제품코드) && r.수량 > 0);
+        // 1. 동적 헤더 인덱스 매핑 (열 순서가 변경되어도 대응 가능)
+        const headers = raw[0].map(h => h ? String(h).trim() : "");
+        const idx = {
+          planDate: headers.indexOf("생산계획 일자"),
+          shipDate: headers.indexOf("출하일자"),
+          customer: headers.indexOf("고객명"),
+          qty: headers.indexOf("수량"),
+          modelName: headers.indexOf("모델명"),
+          prodCode: headers.indexOf("제품코드")
+        };
 
-        if (mapped.length > 0) { setProdData(mapped); setParseMsg(`✅ 생산계획 ${mapped.length}건 로드 완료`); }
-        else setParseMsg("⚠️ 생산계획 데이터를 찾을 수 없습니다.");
-      } catch (err) { setParseMsg("❌ 생산계획 파싱 오류: " + err.message); }
+        // 2. 기준일 설정 (현재 시간: 2026년 6월 8일)
+        const today = new Date("2026-06-08");
+        today.setHours(0, 0, 0, 0);
+
+        // 3. 데이터 파싱 및 필터링
+        const parsedData = raw.slice(1)
+          .map(row => ({
+            생산계획일자: idx.planDate !== -1 ? fmtXlDate(row[idx.planDate]) : "", // 기존 utils 활용 
+            출하일자: idx.shipDate !== -1 ? fmtXlDate(row[idx.shipDate]) : "",
+            고객명: idx.customer !== -1 ? str(row[idx.customer]) : "",
+            수량: idx.qty !== -1 ? num(row[idx.qty]) : 0,
+            모델명: idx.modelName !== -1 ? str(row[idx.modelName]) : "",
+            제품코드: idx.prodCode !== -1 ? str(row[idx.prodCode]) : ""
+          }))
+          .filter(item => {
+            // 빈 행 및 필수 값(제품코드) 누락 데이터 제거
+            if (!item.제품코드) return false;
+
+            // 출하일자 기준 과거 데이터 필터링 (오늘 이전 데이터는 무시)
+            if (item.출하일자) {
+              const itemDate = new Date(item.출하일자);
+              if (itemDate < today) return false;
+            }
+
+            return true;
+          });
+
+        // 상태 업데이트 [cite: 3]
+        setProdData(parsedData);
+        setParseMsg(`✅ 생산계획 ${parsedData.length}건이 성공적으로 로드되었습니다.`);
+
+      } catch (error) {
+        console.error("Excel Parsing Error:", error);
+        setParseMsg("❌ 생산계획 파일 파싱 중 오류가 발생했습니다.");
+      }
     };
     reader.readAsArrayBuffer(file);
   }, []);
