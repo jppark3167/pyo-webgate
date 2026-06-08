@@ -36,17 +36,15 @@ export default function App() {
       setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
     }
   };
-const handleProdFile = useCallback(file => {
+
+  const handleProdFile = useCallback(file => {
     setProdFile(file.name);
     const reader = new FileReader();
-    
+
     reader.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
-        // '6월 생산계획' 등 첫 번째 시트를 가져옵니다.
-        const ws = wb.Sheets[wb.SheetNames[0]]; 
-        
-        // 일단 전체를 배열로 가져옵니다.
+        const ws = wb.Sheets[wb.SheetNames[0]];
         const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
         if (raw.length < 2) {
@@ -54,15 +52,11 @@ const handleProdFile = useCallback(file => {
           return;
         }
 
-        // 1. 실제 헤더 행 동적 탐색 (상단 타이틀/빈 행 무시)
         let headerRowIdx = -1;
         let headers = [];
-        
-        // 상위 20행 이내에서 '제품코드'나 '고객명'이 있는 행을 찾습니다.
+
         for (let i = 0; i < Math.min(20, raw.length); i++) {
-          // 띄어쓰기, 줄바꿈을 모두 제거하여 정확도를 높입니다. (예: "생산계획 일자" -> "생산계획일자")
-          const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : ""); 
-          
+          const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : "");
           if (currentRow.includes("제품코드") || currentRow.includes("생산계획일자")) {
             headerRowIdx = i;
             headers = currentRow;
@@ -75,7 +69,6 @@ const handleProdFile = useCallback(file => {
           return;
         }
 
-        // 2. 인덱스 매핑 (공백이 제거된 상태로 매칭)
         const idx = {
           planDate: headers.findIndex(h => h.includes("생산계획일자")),
           shipDate: headers.findIndex(h => h.includes("출하일자")),
@@ -85,11 +78,9 @@ const handleProdFile = useCallback(file => {
           prodCode: headers.findIndex(h => h.includes("제품코드"))
         };
 
-        // 3. 기준일 설정 (현재: 2026년 6월 8일 00시 00분)
         const today = new Date("2026-06-08");
         today.setHours(0, 0, 0, 0);
 
-        // 4. 데이터 파싱 및 필터링 (찾아낸 헤더 행의 바로 다음 행부터 시작)
         const parsedData = raw.slice(headerRowIdx + 1)
           .map(row => ({
             생산계획일자: idx.planDate !== -1 ? fmtXlDate(row[idx.planDate]) : "",
@@ -100,18 +91,13 @@ const handleProdFile = useCallback(file => {
             제품코드: idx.prodCode !== -1 ? str(row[idx.prodCode]) : ""
           }))
           .filter(item => {
-            // 제품코드가 없는 행(빈 줄, 합계 줄 등)은 제외
             if (!item.제품코드) return false;
-
-            // '생산계획일자' 기준으로 오늘(26.06.08) 이전 데이터 제외
             if (item.생산계획일자) {
               const itemDate = new Date(item.생산계획일자);
               if (itemDate < today) return false;
             } else {
-              // 날짜가 누락된 경우도 무시
               return false;
             }
-
             return true;
           });
 
@@ -175,7 +161,6 @@ const handleProdFile = useCallback(file => {
     return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
   }), [shipData, invData]);
 
-  // 💡 핵심 변경: 담당자 이름이 "이우제" 또는 "김윤식"이면 해외(Ovs), 그 외는 국내(Dom)
   const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => ["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
   const shipDomEnriched = useMemo(() => shipEnriched.filter(r => !["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
 
@@ -191,7 +176,6 @@ const handleProdFile = useCallback(file => {
     return c;
   }, [prodEnriched, shipDomEnriched, shipOvsEnriched, mainTab]);
 
-  // 공통 검색 필터 함수
   const filterShipData = (data) => {
     const q = search.toLowerCase();
     return data.filter(r =>
@@ -216,7 +200,6 @@ const handleProdFile = useCallback(file => {
   const negInvList = useMemo(() => invData.filter(r => r.재고수량 < 0), [invData]);
   const filteredNegInv = useMemo(() => negInvList.filter(r => !search || r.품번?.toLowerCase().includes(search.toLowerCase()) || r.품명?.toLowerCase().includes(search.toLowerCase())), [negInvList, search]);
 
-  // 공통 날짜 정렬 함수
   const sortShipData = (data) => {
     return [...data].sort((a, b) => {
       const vA = a.납기일자; const vB = b.납기일자;
@@ -237,6 +220,24 @@ const handleProdFile = useCallback(file => {
       return sortDesc ? vB.localeCompare(vA) : vA.localeCompare(vB);
     });
   }, [filteredProd, sortDesc]);
+
+  // 💡 [추가됨] 날짜별 생산/출하 요약 데이터 생성
+  const dailySummaryData = useMemo(() => {
+    const summaryMap = {};
+    prodEnriched.forEach(item => {
+      const date = item.생산계획일자 || "날짜미정";
+      if (!summaryMap[date]) {
+        summaryMap[date] = { 생산계획일자: date, 건수: 0, 총수량: 0 };
+      }
+      summaryMap[date].건수 += 1;
+      summaryMap[date].총수량 += item.수량;
+    });
+    return Object.values(summaryMap).sort((a, b) => {
+      if (a.생산계획일자 === "날짜미정") return 1;
+      if (b.생산계획일자 === "날짜미정") return -1;
+      return new Date(a.생산계획일자) - new Date(b.생산계획일자);
+    });
+  }, [prodEnriched]);
 
   return (
     <>
@@ -267,6 +268,8 @@ const handleProdFile = useCallback(file => {
             search={search} setSearch={setSearch} sortDesc={sortDesc} setSortDesc={setSortDesc}
             sortedShipDom={sortedShipDom} sortedShipOvs={sortedShipOvs} sortedProd={sortedProd}
             filteredNegInv={filteredNegInv} negInvList={negInvList}
+            // 💡 [추가됨] DashView로 요약 데이터를 넘겨줍니다.
+            dailySummaryData={dailySummaryData}
           />
         )}
       </div>
