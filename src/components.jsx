@@ -69,7 +69,7 @@ export function renderStatusBadge(status) {
         case "prod_planned":
             return <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>생산예정</span>;
         case "completed":
-            return <span style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>전산완료</span>;
+            return <span style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>선발행</span>;
         default:
             return <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>미등록</span>;
     }
@@ -153,7 +153,7 @@ export function DashView({
 
             {/* 검색 및 필터 */}
             {mainTab !== "summary" && (
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem", flexWrap: "wrap", background: "#fff", padding: "0.5rem", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                <div style={{ flexShrink: 0, display: "flex", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap", background: "#fff", padding: "0.5rem", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                     <input
                         type="text"
                         placeholder="검색어 입력 (고객, 모델, 품번 등)"
@@ -166,6 +166,7 @@ export function DashView({
                         <option value="ok">재고충족</option>
                         <option value="shortage">재고부족</option>
                         <option value="neg">마이너스</option>
+                        <option value="completed">선발행</option> {/* ✨ 필터에 선발행 항목 추가 */}
                     </select>
                     <button onClick={() => setSortDesc(!sortDesc)} style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
                         날짜 {sortDesc ? "내림차순 ▽" : "오름차순 △"}
