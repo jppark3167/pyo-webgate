@@ -66,8 +66,10 @@ export function renderStatusBadge(status) {
             return <span style={{ background: "#fef3c7", color: "#b45309", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>재고부족</span>;
         case "neg":
             return <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>마이너스</span>;
-        case "prod_planned": // ✨ 새로 추가: 생산계획 전용 상태
+        case "prod_planned":
             return <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>생산예정</span>;
+        case "completed":
+            return <span style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>전산완료</span>;
         default:
             return <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>미등록</span>;
     }

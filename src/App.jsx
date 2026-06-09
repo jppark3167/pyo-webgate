@@ -140,20 +140,36 @@ export default function App() {
   }, []);
 
   const handleShipParse = () => {
-    if (!shipText.trim()) { setParseMsg("⚠️ 출하의뢰 텍스트를 입력하세요"); return; }
+    if (!shipText.trim()) {
+      setParseMsg("⚠️ 출하의뢰 텍스트를 입력하세요");
+      return;
+    }
+
     const rows = shipText.trim().split("\n").filter(Boolean).map(line => {
       const cols = line.split("\t");
       if (cols.length < 10) return null;
       return {
-        의뢰일자: str(cols[0]), 납기일자: str(cols[1]), 출하의뢰번호: str(cols[5]), 거래처명: str(cols[6]),
-        품목명: str(cols[7]), 품목번호: str(cols[8]), 규격: str(cols[9]), 수량: num(cols[10]),
-        담당자: str(cols[13]), 상태: str(cols[14]) || "작성",
+        의뢰일자: str(cols[0]),
+        납기일자: str(cols[1]),
+        출하의뢰번호: str(cols[5]),
+        거래처명: str(cols[6]),
+        품목명: str(cols[7]),
+        품목번호: str(cols[8]),
+        규격: str(cols[9]),
+        수량: num(cols[10]),
+        담당자: str(cols[13]),
+        상태: str(cols[14]) || "작성",
       };
-    }).filter(r => r && r.거래처명 && !["운반비", "기타"].includes(r.품목명));
+    }).filter(r =>
+      r &&
+      r.거래처명 &&
+      !["운반비", "기타"].includes(r.품목명)
+      // 💡 "완료" 필터링 삭제! 대시보드에 정상적으로 렌더링됩니다.
+    );
 
-    if (rows.length === 0) { setParseMsg("⚠️ 유효한 출하의뢰 데이터가 없습니다."); return; }
     setShipData(rows);
-    setParseMsg(`✅ 출하의뢰 ${rows.length}건 로드 완료`);
+    setShipText("");
+    setParseMsg(`✅ 출하 의뢰 ${rows.length}건이 성공적으로 적용되었습니다.`);
   };
 
   const shipEnriched = useMemo(() => {
@@ -190,44 +206,47 @@ export default function App() {
       const shipDate = str(ship.납기일자);
       const reqQty = Number(ship.수량) || 0;
 
-      // 표에 보여주기 위한 순수 현재고 (변하지 않는 기준점)
       const baseInv = invData.find(r => str(r.품번).toUpperCase() === code);
       const currentInvQty = baseInv ? Number(baseInv.재고수량) : null;
 
       if (runningInvMap[code] === undefined) runningInvMap[code] = 0;
 
-      // 💡 핵심 로직: 납기일(shipDate) 이전에 완료되는 생산 계획을 찾아 누적 재고에 더함
       let addedProdQtyThisStep = 0;
       if (prodMap[code]) {
         if (prodIdxTracker[code] === undefined) prodIdxTracker[code] = 0;
 
         while (prodIdxTracker[code] < prodMap[code].length) {
           const pItem = prodMap[code][prodIdxTracker[code]];
-
-          // 생산일이 납기일보다 작거나 같으면 (생산 완료 후 출하 가능)
           if (pItem.date <= shipDate) {
-            runningInvMap[code] += pItem.qty; // 예상재고 통에 생산량 추가
-            addedProdQtyThisStep += pItem.qty; // UI 표기를 위해 이번 스텝에 추가된 양 기록
+            runningInvMap[code] += pItem.qty;
+            addedProdQtyThisStep += pItem.qty;
             prodIdxTracker[code]++;
           } else {
-            break; // 아직 납기일이 안 된 미래의 생산계획이면 다음 출하 건 연산으로 넘김
+            break;
           }
         }
       }
 
-      // 출하 전 누적 재고에서 출하 의뢰 수량 차감 -> 최종 예상 재고
-      runningInvMap[code] -= reqQty;
+      // 💡 핵심 로직: 상태가 '완료'가 아닌 경우에만 예상 재고에서 수량을 뺌!
+      // (이미 완료된 건은 전산 현재고에 차감이 반영되어 있으므로 이중으로 빼지 않음)
+      if (ship.상태 !== "완료") {
+        runningInvMap[code] -= reqQty;
+      }
+
       const projectedInvQty = runningInvMap[code];
 
-      // 출하 후 예상재고가 0 이상이면 재고충족, 음수면 재고부족
       let status = projectedInvQty >= 0 ? "ok" : "shortage";
       if (currentInvQty === null) status = "unknown";
 
+      // 💡 상태가 '완료'인 건은 뱃지 상태를 강제로 'completed'로 덮어씌움
+      if (ship.상태 === "완료") status = "completed";
+
       return {
         ...ship,
-        _currentInvQty: currentInvQty,          // 현재고 (DB 기준)
-        _incomingProd: addedProdQtyThisStep,    // ⚡ 해당 납기일에 맞춰 유효하게 투입된 생산량
-        _projectedInvQty: projectedInvQty,      // ⚡ 반영 후 최종 예상재고
+        _currentInvQty: currentInvQty,
+        _incomingProd: addedProdQtyThisStep,
+        // 💡 완료된 건은 다음 예상재고 흐름에 혼선을 주지 않도록 표기를 "-" 로 처리
+        _projectedInvQty: ship.상태 === "완료" ? "-" : projectedInvQty,
         _status: status
       };
     });
