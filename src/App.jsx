@@ -157,40 +157,78 @@ export default function App() {
   };
 
   const shipEnriched = useMemo(() => {
-    // 1. 납기일자 오름차순 정렬 (먼저 출하되는 건부터 순차 차감하기 위함)
+    // ① 납기일자 오름차순으로 출하 데이터 정렬 (순차적 재고 차감을 위함)
     const sortedShip = [...shipData].sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
 
-    // 2. 품목별로 '이전 출하건에서 이미 사용한(차감된) 재고'를 추적하는 객체
-    const consumedQty = {};
+    // ② 품목별 누적 재고를 관리할 Map 생성 (초기값: 엑셀에서 가져온 현재 재고)
+    const runningInvMap = {};
+    invData.forEach(item => {
+      runningInvMap[str(item.품번).toUpperCase()] = Number(item.재고수량) || 0;
+    });
 
-    return sortedShip.map(r => {
-      const code = str(r.품목번호);
+    // ③ 품목별 생산 계획을 날짜순으로 정리
+    const prodMap = {};
+    prodData.forEach(r => {
+      const code = str(r.제품코드).toUpperCase();
+      if (!prodMap[code]) prodMap[code] = [];
 
-      // 3. 순수 현재 재고 파악
-      const inv = findInv(invData, code);
-      const currentInvQty = inv?.재고수량 ?? 0;
+      // 생산계획일자가 없으면 출하일자를 대체 사용
+      const pDate = str(r.생산계획일자 || r.출하일자);
+      const pQty = Number(r.수량 || r.계획수량) || 0;
+      prodMap[code].push({ date: pDate, qty: pQty });
+    });
 
-      // 4. 현재 납기일자(포함) 이전에 입고 예정인 '총 생산계획 수량' 합산
-      const totalIncomingProd = prodData
-        .filter(p => str(p.제품코드) === code && str(p.생산계획일자 || p.출하일자) <= str(r.납기일자))
-        .reduce((sum, p) => sum + (num(p.수량) || num(p.계획수량) || 0), 0);
+    // 품목별로 생산 날짜가 빠른 순으로 정렬
+    Object.keys(prodMap).forEach(k => prodMap[k].sort((a, b) => a.date.localeCompare(b.date)));
 
-      // 누적 차감량 초기화
-      if (consumedQty[code] === undefined) consumedQty[code] = 0;
+    // ④ 품목별 생산계획 반영 인덱스 추적기
+    const prodIdxTracker = {};
 
-      // 5. 예상재고 (순수 현재고 + 생산예정 - 이전 출하건들의 누적 차감량)
-      const projectedInvQty = currentInvQty + totalIncomingProd - consumedQty[code];
+    // ⑤ 출하 건별 순회하며 재고 시뮬레이션
+    return sortedShip.map(ship => {
+      const code = str(ship.품목번호).toUpperCase();
+      const shipDate = str(ship.납기일자);
+      const reqQty = Number(ship.수량) || 0;
 
-      // 6. 다음 출하건 계산을 위해, 현재 의뢰수량만큼 누적 차감량에 추가
-      consumedQty[code] += num(r.수량);
+      // 표에 보여주기 위한 순수 현재고 (변하지 않는 기준점)
+      const baseInv = invData.find(r => str(r.품번).toUpperCase() === code);
+      const currentInvQty = baseInv ? Number(baseInv.재고수량) : null;
+
+      if (runningInvMap[code] === undefined) runningInvMap[code] = 0;
+
+      // 💡 핵심 로직: 납기일(shipDate) 이전에 완료되는 생산 계획을 찾아 누적 재고에 더함
+      let addedProdQtyThisStep = 0;
+      if (prodMap[code]) {
+        if (prodIdxTracker[code] === undefined) prodIdxTracker[code] = 0;
+
+        while (prodIdxTracker[code] < prodMap[code].length) {
+          const pItem = prodMap[code][prodIdxTracker[code]];
+
+          // 생산일이 납기일보다 작거나 같으면 (생산 완료 후 출하 가능)
+          if (pItem.date <= shipDate) {
+            runningInvMap[code] += pItem.qty; // 예상재고 통에 생산량 추가
+            addedProdQtyThisStep += pItem.qty; // UI 표기를 위해 이번 스텝에 추가된 양 기록
+            prodIdxTracker[code]++;
+          } else {
+            break; // 아직 납기일이 안 된 미래의 생산계획이면 다음 출하 건 연산으로 넘김
+          }
+        }
+      }
+
+      // 출하 전 누적 재고에서 출하 의뢰 수량 차감 -> 최종 예상 재고
+      runningInvMap[code] -= reqQty;
+      const projectedInvQty = runningInvMap[code];
+
+      // 출하 후 예상재고가 0 이상이면 재고충족, 음수면 재고부족
+      let status = projectedInvQty >= 0 ? "ok" : "shortage";
+      if (currentInvQty === null) status = "unknown";
 
       return {
-        ...r,
-        _inv: inv,
-        _currentInvQty: currentInvQty,     // 컬럼 1: 현재고
-        _incomingProd: totalIncomingProd,  // 컬럼 2: 생산예정
-        _projectedInvQty: projectedInvQty, // 컬럼 3: 예상재고
-        _status: shipStatus(projectedInvQty, num(r.수량)) // 예상재고 기준으로 상태 판별
+        ...ship,
+        _currentInvQty: currentInvQty,          // 현재고 (DB 기준)
+        _incomingProd: addedProdQtyThisStep,    // ⚡ 해당 납기일에 맞춰 유효하게 투입된 생산량
+        _projectedInvQty: projectedInvQty,      // ⚡ 반영 후 최종 예상재고
+        _status: status
       };
     });
   }, [shipData, invData, prodData]);
@@ -200,7 +238,10 @@ export default function App() {
 
   const prodEnriched = useMemo(() => prodData.map(r => {
     const inv = findInv(invData, r.제품코드);
-    return { ...r, _inv: inv, _status: shipStatus(inv?.재고수량 ?? null, r.수량) };
+    return {
+      ...r, _inv: inv, _status: "prod_planned"
+      // 💡 재고부족 대신 '생산예정'으로 고정
+    };
   }), [prodData, invData]);
 
   const prodStats = useMemo(() => {

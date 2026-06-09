@@ -58,7 +58,7 @@ const tdStyle = {
 // ==========================================
 // 2. 상태 표시 배지 렌더링 헬퍼 함수
 // ==========================================
-function renderStatusBadge(status) {
+export function renderStatusBadge(status) {
     switch (status) {
         case "ok":
             return <span style={{ background: "#dcfce7", color: "#15803d", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>재고충족</span>;
@@ -66,11 +66,12 @@ function renderStatusBadge(status) {
             return <span style={{ background: "#fef3c7", color: "#b45309", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>재고부족</span>;
         case "neg":
             return <span style={{ background: "#fee2e2", color: "#b91c1c", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>마이너스</span>;
+        case "prod_planned": // ✨ 새로 추가: 생산계획 전용 상태
+            return <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>생산예정</span>;
         default:
             return <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>미등록</span>;
     }
 }
-
 // ==========================================
 // 3. INPUT VIEW (파일 업로드 및 텍스트 파싱)
 // ==========================================
