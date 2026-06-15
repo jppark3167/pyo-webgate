@@ -99,3 +99,21 @@ export const loadData = (key) => {
         return saved ? JSON.parse(saved) : [];
     } catch (e) { return []; }
 };
+
+// ── 단가 확인용 헬퍼 함수 ──────────────────────────────────────────
+export function findPrice(priceData, itemCode) {
+    if (!itemCode || !priceData) return null;
+    const cCode = String(itemCode).trim().toUpperCase();
+    // 단가표에서 '모델명', 'Model', '품번' 중 일치하는 것을 찾습니다.
+    return priceData.find(r => {
+        const target = String(r['모델명'] || r['Model'] || r['품번'] || '').trim().toUpperCase();
+        return target === cCode;
+    }) || null;
+}
+
+// ── 단가 상태 뱃지 상수 ──────────────────────────────────────────
+export const PRICE_STATUS = {
+    match: { bg: "#dcfce7", bdr: "#86efac", txt: "#166534", label: "단가 o" },
+    mismatch: { bg: "#fee2e2", bdr: "#fca5a5", txt: "#991b1b", label: "단가 x" },
+    unknown: { bg: "#fef9c3", bdr: "#fde047", txt: "#713f12", label: "확인필요" },
+};
