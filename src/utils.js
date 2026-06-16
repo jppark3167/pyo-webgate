@@ -1,3 +1,6 @@
+
+//utils.js: 유틸리티 함수 및 상수 정의
+
 // ── 모바일 반응형 CSS ──────────────────────────
 export const globalCss = `
   .swipe-menu { overflow-x: auto; -webkit-overflow-scrolling: touch; -ms-overflow-style: none; scrollbar-width: none; }

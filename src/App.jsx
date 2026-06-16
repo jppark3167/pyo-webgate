@@ -1,3 +1,4 @@
+//App.jsx: 메인 애플리케이션 컴포넌트
 import { useState, useMemo, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { globalCss, loadData, parseExcelDynamic, fmtXlDate, str, num, findInv, shipStatus } from "./utils";
