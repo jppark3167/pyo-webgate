@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { globalCss, loadData, parseExcelDynamic, fmtXlDate, str, num, findInv, shipStatus } from "./utils";
 import { InputView, DashView } from "./components";
+import { processProdFile, processInvFile } from "./excelParser";
 
 export default function App() {
   const [prodData, setProdData] = useState(() => loadData('wg_prod'));
@@ -42,15 +43,27 @@ export default function App() {
     setProdFile(file.name);
     setParseMsg("생산계획 파일을 분석 중입니다...");
 
-    // 생산계획 데이터에서 반드시 찾아야 할 헤더 키워드 (시스템에 맞게 수정 가능)
-    const requiredKeys = ["제품코드", "수량"];
-
-    processExcelFile(
+    processProdFile(
       file,
-      requiredKeys,
       (data) => {
         setProdData(data);
-        setParseMsg(`✅ 생산계획 파일 업로드 완료 (${data.length}건)`);
+        setParseMsg(`✅ 생산계획 ${data.length}건이 성공적으로 로드되었습니다.`);
+      },
+      (errorMsg) => {
+        setParseMsg(errorMsg);
+      }
+    );
+  }, []);
+
+  const handleInvFile = useCallback(file => {
+    setInvFile(file.name);
+    setParseMsg("재고현황 파일을 분석 중입니다...");
+
+    processInvFile(
+      file,
+      (mapped) => {
+        setInvData(mapped);
+        setParseMsg(`✅ 재고현황 ${mapped.length}품목 로드 완료`);
       },
       (errorMsg) => {
         setParseMsg(errorMsg);
