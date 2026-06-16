@@ -40,35 +40,39 @@ export function parseExcelDynamic(rawArray, keyIdentifiers) {
     let headerIdx = -1;
     let headers = [];
 
-    for (let i = 0; i < Math.min(30, rawArray.length); i++) {
-        if (!rawArray[i]) continue;
+    // 1. 헤더 행 찾기 (엑셀 상단 20행 이내에서 검색하여 오류 방지)
+    for (let i = 0; i < Math.min(rawArray.length, 20); i++) {
         const rowStr = rawArray[i].join("").replace(/\s/g, "");
 
-        const isHeader = keyIdentifiers.every(k => {
-            if (Array.isArray(k)) return k.some(subKey => rowStr.includes(subKey));
-            return rowStr.includes(k);
-        });
-
-        if (isHeader) {
+        // keyIdentifiers 배열에 있는 핵심 키워드가 포함된 행을 헤더로 간주
+        if (keyIdentifiers.some(k => rowStr.includes(k.replace(/\s/g, "")))) {
             headerIdx = i;
-            headers = rawArray[i].map(h => str(h).replace(/\n|\r/g, ""));
+            headers = rawArray[i].map(h => (h ? String(h).trim() : ""));
             break;
         }
     }
 
+    // 헤더를 찾지 못한 경우 빈 배열 반환
     if (headerIdx === -1) return [];
-    const data = [];
+
+    // 2. 데이터 행 파싱
+    const parsedData = [];
     for (let i = headerIdx + 1; i < rawArray.length; i++) {
         const row = rawArray[i];
-        if (!row || row.length === 0 || !row.some(c => c)) continue;
-        const firstCell = str(row[0]).toUpperCase();
-        if (firstCell.includes("TOTAL") || firstCell.includes("합계") || firstCell.includes("총계")) continue;
 
-        const obj = {};
-        headers.forEach((colName, idx) => { if (colName) obj[colName] = row[idx]; });
-        data.push(obj);
+        // 완전히 비어있는 행은 무시
+        if (!row || row.every(cell => cell === "" || cell === null || cell === undefined)) continue;
+
+        const rowObj = {};
+        headers.forEach((header, colIdx) => {
+            if (header) {
+                rowObj[header] = row[colIdx];
+            }
+        });
+        parsedData.push(rowObj);
     }
-    return data;
+
+    return parsedData;
 }
 
 // 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭

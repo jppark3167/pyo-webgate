@@ -40,77 +40,42 @@ export default function App() {
 
   const handleProdFile = useCallback(file => {
     setProdFile(file.name);
-    const reader = new FileReader();
+    setParseMsg("생산계획 파일을 분석 중입니다...");
 
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    // 생산계획 데이터에서 반드시 찾아야 할 헤더 키워드 (시스템에 맞게 수정 가능)
+    const requiredKeys = ["제품코드", "수량"];
 
-        if (raw.length < 2) {
-          setParseMsg("⚠️ 데이터가 충분하지 않거나 양식이 잘못되었습니다.");
-          return;
-        }
-
-        let headerRowIdx = -1;
-        let headers = [];
-
-        for (let i = 0; i < Math.min(20, raw.length); i++) {
-          const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : "");
-          if (currentRow.includes("제품코드") || currentRow.includes("생산계획일자")) {
-            headerRowIdx = i;
-            headers = currentRow;
-            break;
-          }
-        }
-
-        if (headerRowIdx === -1) {
-          setParseMsg("❌ 필수 헤더(생산계획 일자, 제품코드 등)를 찾을 수 없습니다. 엑셀 양식을 확인해주세요.");
-          return;
-        }
-
-        const idx = {
-          planDate: headers.findIndex(h => h.includes("생산계획일자")),
-          shipDate: headers.findIndex(h => h.includes("출하일자")),
-          customer: headers.findIndex(h => h.includes("고객명")),
-          qty: headers.findIndex(h => h.includes("수량")),
-          modelName: headers.findIndex(h => h.includes("모델명")),
-          prodCode: headers.findIndex(h => h.includes("제품코드"))
-        };
-
-        const today = new Date("2026-06-08");
-        today.setHours(0, 0, 0, 0);
-
-        const parsedData = raw.slice(headerRowIdx + 1)
-          .map(row => ({
-            생산계획일자: idx.planDate !== -1 ? fmtXlDate(row[idx.planDate]) : "",
-            출하일자: idx.shipDate !== -1 ? fmtXlDate(row[idx.shipDate]) : "",
-            고객명: idx.customer !== -1 ? str(row[idx.customer]) : "",
-            수량: idx.qty !== -1 ? num(row[idx.qty]) : 0,
-            모델명: idx.modelName !== -1 ? str(row[idx.modelName]) : "",
-            제품코드: idx.prodCode !== -1 ? str(row[idx.prodCode]) : ""
-          }))
-          .filter(item => {
-            if (!item.제품코드) return false;
-            if (item.생산계획일자) {
-              const itemDate = new Date(item.생산계획일자);
-              if (itemDate < today) return false;
-            } else {
-              return false;
-            }
-            return true;
-          });
-
-        setProdData(parsedData);
-        setParseMsg(`✅ 생산계획 ${parsedData.length}건이 성공적으로 로드되었습니다.`);
-
-      } catch (error) {
-        console.error("Excel Parsing Error:", error);
-        setParseMsg("❌ 생산계획 파일 파싱 중 오류가 발생했습니다.");
+    processExcelFile(
+      file,
+      requiredKeys,
+      (data) => {
+        setProdData(data);
+        setParseMsg(`✅ 생산계획 파일 업로드 완료 (${data.length}건)`);
+      },
+      (errorMsg) => {
+        setParseMsg(errorMsg);
       }
-    };
-    reader.readAsArrayBuffer(file);
+    );
+  }, []);
+
+  const handleInvFile = useCallback(file => {
+    setInvFile(file.name);
+    setParseMsg("재고 파일을 분석 중입니다...");
+
+    // 재고 데이터에서 반드시 찾아야 할 헤더 키워드 
+    const requiredKeys = ["품번", "재고수량"];
+
+    processExcelFile(
+      file,
+      requiredKeys,
+      (data) => {
+        setInvData(data);
+        setParseMsg(`✅ 재고 파일 업로드 완료 (${data.length}건)`);
+      },
+      (errorMsg) => {
+        setParseMsg(errorMsg);
+      }
+    );
   }, []);
 
   const handleInvFile = useCallback(file => {
