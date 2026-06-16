@@ -78,33 +78,6 @@ export default function App() {
     );
   }, []);
 
-  const handleInvFile = useCallback(file => {
-    setInvFile(file.name);
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
-        const parsed = parseExcelDynamic(raw, [
-          ["품번", "품목코드", "품목번호", "제품코드", "ITEM_CODE"], ["재고수량", "현재고", "수량", "재고", "실재고"]
-        ]);
-
-        const mapped = parsed.map(r => ({
-          품번: str(r["품번"] || r["품목코드"] || r["품목번호"] || r["제품코드"] || r["ITEM_CODE"]),
-          품명: str(r["품명"] || r["품목명"] || r["ITEM_NAME"] || r["제품명"]),
-          규격: str(r["규격"] || r["SPEC"] || r["스펙"]),
-          재고수량: num(r["재고수량"] || r["현재고"] || r["수량"] || r["재고"] || r["실재고"]),
-        })).filter(r => r.품번);
-
-        if (mapped.length > 0) { setInvData(mapped); setParseMsg(`✅ 재고현황 ${mapped.length}품목 로드 완료`); }
-        else setParseMsg("⚠️ 재고현황 데이터를 찾을 수 없습니다.");
-      } catch (err) { setParseMsg("❌ 재고현황 파싱 오류: " + err.message); }
-    };
-    reader.readAsArrayBuffer(file);
-  }, []);
-
   const handleShipParse = () => {
     if (!shipText.trim()) {
       setParseMsg("⚠️ 출하의뢰 텍스트를 입력하세요");
