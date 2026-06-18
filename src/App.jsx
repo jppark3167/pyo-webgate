@@ -94,34 +94,44 @@ export default function App() {
   const handleShipParse = () => {
     if (!shipText.trim()) {
       setParseMsg("⚠️ 출하의뢰 텍스트를 입력하세요");
-      return;
+      return; // 
     }
 
-    const rows = shipText.trim().split("\n").filter(Boolean).map(line => {
-      const cols = line.split("\t");
-      if (cols.length < 10) return null;
-      return {
-        의뢰일자: str(cols[0]),
-        납기일자: str(cols[1]),
-        출하의뢰번호: str(cols[5]),
-        거래처명: str(cols[6]),
-        품목명: str(cols[7]),
-        품목번호: str(cols[8]),
-        규격: str(cols[9]),
-        수량: num(cols[10]),
-        담당자: str(cols[13]),
-        상태: str(cols[14]) || "작성",
-      };
-    }).filter(r =>
-      r &&
-      r.거래처명 &&
-      !["운반비", "기타"].includes(r.품목명)
-      // 💡 "완료" 필터링 삭제! 대시보드에 정상적으로 렌더링됩니다.
-    );
+    try {
+      // 1. 전체 텍스트를 줄바꿈(\n) 기준으로 분리하여 배열로 만듭니다.
+      const rows = shipText.trim().split("\n");
 
-    setShipData(rows);
-    setShipText("");
-    setParseMsg(`✅ 출하 의뢰 ${rows.length}건이 성공적으로 적용되었습니다.`);
+      // 2. 각 줄을 탭(\t) 기준으로 다시 분리하여 객체로 매핑합니다.
+      const parsedData = rows.map((row) => {
+        const cols = row.split("\t");
+
+        // 샘플 데이터 기준 컬럼 인덱스 매핑
+        return {
+          작성일자: cols[0]?.trim(),
+          납기일자: cols[1]?.trim(),
+          출하번호: cols[4]?.trim(),
+          거래처명: cols[5]?.trim(),
+          모델명: cols[6]?.trim(),
+          품목번호: cols[7]?.trim(), // 재고 매칭 시 핵심 키
+          품목명: cols[8]?.trim(),
+          수량: parseFloat(cols[9]?.replace(/,/g, "")) || 0, // 숫자 변환
+          단가: parseFloat(cols[10]?.replace(/,/g, "")) || 0,
+          금액: parseFloat(cols[11]?.replace(/,/g, "")) || 0,
+          담당자: cols[12]?.trim(), // 해외/국내 담당자 분류 키
+          상태: cols[13]?.trim()
+        };
+      }).filter(item => item.품목번호); // 품목번호가 없는 빈 줄이나 쓰레기값 필터링
+
+      // 3. 파싱된 데이터를 상태에 업데이트합니다.
+      setShipData(parsedData);
+      setParseMsg(`✅ ${parsedData.length}건의 출하의뢰 데이터가 성공적으로 입력되었습니다.`);
+      setShipText(""); // 입력 완료 후 텍스트 에어리어 초기화
+      setView("dash"); // 입력 완료 후 자동으로 대시보드 화면으로 이동 (선택사항)
+
+    } catch (error) {
+      console.error(error);
+      setParseMsg("❌ 파싱 중 오류가 발생했습니다. 데이터 형식을 다시 확인해주세요.");
+    }
   };
 
   const shipEnriched = useMemo(() => {
