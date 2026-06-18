@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 //Components.jsx: 재사용 가능한 컴포넌트 및 스타일 정의
 // ==========================================
@@ -132,8 +132,9 @@ export function InputView({
 export function DashView({
     mainTab, setMainTab, prodStats, filterStatus, setFilterStatus, search, setSearch,
     sortDesc, setSortDesc, sortedShipDom, sortedShipOvs, sortedProd,
-    filteredNegInv, negInvList, dailySummaryData = []
+    filteredNegInv, negInvList, dailySummaryData = [], allShipData = []
 }) {
+    const [selectedDate, setSelectedDate] = useState(null);
 
     let activeData = [];
     if (mainTab === "ship_dom") activeData = sortedShipDom;
@@ -164,8 +165,8 @@ export function DashView({
                     />
                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
                         <option value="all">전체 상태</option>
-                        <option value="ok">재고 O</option>
-                        <option value="shortage">재고 X</option>
+                        <option value="ok">이상없음</option>
+                        <option value="shortage">재고부족</option>
                         <option value="neg">마이너스</option>
                         <option value="completed">선발행</option> {/* ✨ 필터에 선발행 항목 추가 */}
                     </select>
@@ -216,9 +217,9 @@ export function DashView({
                             )}
                             {mainTab === "summary" && (
                                 <>
-                                    <th style={thStyle}>생산계획일자</th>
-                                    <th style={thStyle}>계획 건수</th>
-                                    <th style={thStyle}>총 생산수량</th>
+                                    <th style={thStyle}>납기일자</th>
+                                    <th style={thStyle}>출하 건수</th>
+                                    <th style={thStyle}>총 출하수량</th>
                                 </>
                             )}
                         </tr>
@@ -273,13 +274,65 @@ export function DashView({
                             </tr>
                         ))}
 
-                        {mainTab === "summary" && dailySummaryData.map((item, idx) => (
-                            <tr key={idx} style={tbodyTrStyle}>
-                                <td style={{ ...tdStyle, fontWeight: "600", color: "#0ea5e9" }}>{item.생산계획일자}</td>
-                                <td style={tdStyle}>{item.건수}건</td>
-                                <td style={{ ...tdStyle, fontWeight: "700" }}>{item.총수량?.toLocaleString()}</td>
-                            </tr>
-                        ))}
+                        {mainTab === "summary" && dailySummaryData.map((item, idx) => {
+                            const isOpen = selectedDate === item.납기일자;
+                            const detailItems = isOpen
+                                ? allShipData
+                                    .filter(r => (r.납기일자 || "날짜미정") === item.납기일자)
+                                    .sort((a, b) => (a.거래처명 || "").localeCompare(b.거래처명 || "", "ko"))
+                                : [];
+
+                            return (
+                                <React.Fragment key={idx}>
+                                    <tr
+                                        style={{ ...tbodyTrStyle, cursor: "pointer", background: isOpen ? "#f0f9ff" : undefined }}
+                                        onClick={() => setSelectedDate(isOpen ? null : item.납기일자)}
+                                    >
+                                        <td style={{ ...tdStyle, fontWeight: "600", color: "#0ea5e9" }}>
+                                            {isOpen ? "▼" : "▶"} {item.납기일자}
+                                        </td>
+                                        <td style={tdStyle}>{item.건수}건</td>
+                                        <td style={{ ...tdStyle, fontWeight: "700" }}>{item.총수량?.toLocaleString()}</td>
+                                    </tr>
+                                    {isOpen && (
+                                        <tr>
+                                            <td colSpan="3" style={{ padding: 0, background: "#f8fafc" }}>
+                                                <table style={{ ...tableStyle, width: "100%" }}>
+                                                    <thead>
+                                                        <tr style={{ background: "#eef2f7" }}>
+                                                            <th style={thStyle}>거래처명</th>
+                                                            <th style={{ ...thStyle, width: "25%" }}>품목명 / 규격</th>
+                                                            <th style={thStyle}>수량</th>
+                                                            <th style={thStyle}>담당</th>
+                                                            <th style={thStyle}>상태</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {detailItems.map((d, di) => (
+                                                            <tr key={di} style={tbodyTrStyle}>
+                                                                <td style={{ ...tdStyle, fontWeight: "600" }}>{d.거래처명}</td>
+                                                                <td style={{ ...tdStyle, textAlign: "left" }}>
+                                                                    <div style={{ fontWeight: "600" }}>{d.품목명}</div>
+                                                                    <div style={{ fontSize: "0.6875rem", color: "#64748b", marginTop: "2px" }}>{d.규격}</div>
+                                                                </td>
+                                                                <td style={tdStyle}>{d.수량}</td>
+                                                                <td style={tdStyle}>{d.담당자}</td>
+                                                                <td style={tdStyle}>{renderStatusBadge(d._status)}</td>
+                                                            </tr>
+                                                        ))}
+                                                        {detailItems.length === 0 && (
+                                                            <tr>
+                                                                <td colSpan="5" style={{ padding: "1rem", textAlign: "center", color: "#94a3b8" }}>해당 날짜 출하 데이터가 없습니다.</td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
 
                         {((mainTab !== "summary" && activeData.length === 0) || (mainTab === "summary" && dailySummaryData.length === 0)) && (
                             <tr>

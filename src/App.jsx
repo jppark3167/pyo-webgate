@@ -146,7 +146,7 @@ export default function App() {
         // 그 외(작성 등)는 (의뢰수량 - 예상재고) 기준으로 판단
         const diff = str(r.상태) === "완료"
           ? projected
-          : projected - r.수량 ;
+          : r.수량 - projected;
         const computedStatus = diff < 0 ? "shortage" : "ok"; // > 0(또는 0) 이상없음 / < 0 재고부족
 
         return {
@@ -237,23 +237,23 @@ export default function App() {
     });
   }, [filteredProd, sortDesc]);
 
-  // 날짜별 종합 요약 맵 생성
+  // 날짜별(납기일자) 출하 종합 요약 맵 생성
   const dailySummaryData = useMemo(() => {
     const summaryMap = {};
-    prodEnriched.forEach(item => {
-      const date = item.생산계획일자 || "날짜미정";
+    shipEnriched.forEach(item => {
+      const date = item.납기일자 || "날짜미정";
       if (!summaryMap[date]) {
-        summaryMap[date] = { 생산계획일자: date, 건수: 0, 총수량: 0 };
+        summaryMap[date] = { 납기일자: date, 건수: 0, 총수량: 0 };
       }
       summaryMap[date].건수 += 1;
       summaryMap[date].총수량 += item.수량;
     });
     return Object.values(summaryMap).sort((a, b) => {
-      if (a.생산계획일자 === "날짜미정") return 1;
-      if (b.생산계획일자 === "날짜미정") return -1;
-      return new Date(a.생산계획일자) - new Date(b.생산계획일자);
+      if (a.납기일자 === "날짜미정") return 1;
+      if (b.납기일자 === "날짜미정") return -1;
+      return new Date(a.납기일자) - new Date(b.납기일자);
     });
-  }, [prodEnriched]);
+  }, [shipEnriched]);
 
   return (
     <>
@@ -312,6 +312,7 @@ export default function App() {
               filteredNegInv={filteredNegInv}
               negInvList={negInvList}
               dailySummaryData={dailySummaryData}
+              allShipData={shipEnriched}
             />
           )}
         </div>
