@@ -146,7 +146,7 @@ export default function App() {
         // 그 외(작성 등)는 (의뢰수량 - 예상재고) 기준으로 판단
         const diff = str(r.상태) === "완료"
           ? projected
-          : r.수량 - projected;
+          : projected - r.수량 ;
         const computedStatus = diff < 0 ? "shortage" : "ok"; // > 0(또는 0) 이상없음 / < 0 재고부족
 
         return {
