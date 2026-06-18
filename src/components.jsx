@@ -62,7 +62,7 @@ const tdStyle = {
 export function renderStatusBadge(status) {
     switch (status) {
         case "ok":
-            return <span style={{ background: "#dcfce7", color: "#15803d", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>재고충족</span>;
+            return <span style={{ background: "#dcfce7", color: "#15803d", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>이상없음</span>;
         case "shortage":
             return <span style={{ background: "#fef3c7", color: "#b45309", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>재고부족</span>;
         case "neg":
@@ -164,8 +164,8 @@ export function DashView({
                     />
                     <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
                         <option value="all">전체 상태</option>
-                        <option value="ok">재고충족</option>
-                        <option value="shortage">재고부족</option>
+                        <option value="ok">재고 O</option>
+                        <option value="shortage">재고 X</option>
                         <option value="neg">마이너스</option>
                         <option value="completed">선발행</option> {/* ✨ 필터에 선발행 항목 추가 */}
                     </select>
