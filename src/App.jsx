@@ -142,9 +142,10 @@ export default function App() {
         const incomingProd = prodQtyMap[str(r.품목번호).toUpperCase()] || 0; // 생산예정: 생산계획 데이터, 없으면 0
         const projected = currentInv + incomingProd;                       // 예상재고 = 현재고 + 생산예정
 
-        // 상태 판정: 기본은 (의뢰수량 - 예상재고), 입력 상태가 "완료"면 (의뢰수량 - (의뢰수량 + 예상재고)) 기준
+        // 상태 판정: 완료 건은 이미 재고에 반영된 것으로 보고 예상재고 값 자체로 판단,
+        // 그 외(작성 등)는 (의뢰수량 - 예상재고) 기준으로 판단
         const diff = str(r.상태) === "완료"
-          ? r.수량 - (r.수량 + projected)
+          ? projected
           : r.수량 - projected;
         const computedStatus = diff < 0 ? "shortage" : "ok"; // > 0(또는 0) 이상없음 / < 0 재고부족
 
