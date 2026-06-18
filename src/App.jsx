@@ -80,6 +80,7 @@ export default function App() {
   }, []);
 
   // 💡 탭 분리형(TSV) 출하의뢰 복사 텍스트 분석 로직 완벽 적용
+  // 💡 탭 분리형(TSV) 출하의뢰 텍스트 파싱 (뒤에서부터 매핑하여 밀림 완벽 방지)
   const handleShipParse = () => {
     if (!shipText.trim()) {
       setParseMsg("⚠️ 출하의뢰 텍스트를 입력하세요");
@@ -89,22 +90,27 @@ export default function App() {
     try {
       const rows = shipText.trim().split("\n");
       const parsedData = rows.map((row) => {
-        const cols = row.split("\t");
+        // 각 줄을 탭으로 나누고 앞뒤 공백을 자릅니다.
+        const cols = row.split("\t").map(c => c.trim());
+        const len = cols.length;
+
+        // 💡 핵심: 앞쪽 빈 칸들 때문에 배열 길이가 달라져도, 
+        // 뒤에서부터(len - x) 역추적하면 정확한 데이터를 100% 잡아냅니다!
         return {
-          작성일자: cols[0]?.trim(),
-          납기일자: cols[1]?.trim(),
-          출하번호: cols[4]?.trim(),
-          거래처명: cols[5]?.trim(),
-          모델명: cols[6]?.trim(),
-          품목번호: cols[7]?.trim(),
-          품목명: cols[8]?.trim(),
-          수량: parseFloat(cols[9]?.replace(/,/g, "")) || 0,
-          단가: parseFloat(cols[10]?.replace(/,/g, "")) || 0,
-          금액: parseFloat(cols[11]?.replace(/,/g, "")) || 0,
-          담당자: cols[12]?.trim(),
-          상태: cols[13]?.trim()
+          작성일자: cols[0], // 왼쪽 끝은 고정
+          납기일자: cols[1],
+          출하번호: cols[len - 10],
+          거래처명: cols[len - 9],
+          모델명: cols[len - 8],
+          품목번호: cols[len - 7], // 재고 대조용 '품번' (TTA-50DLAF-NTR 등)
+          품목명: cols[len - 6],
+          수량: parseFloat(cols[len - 5]?.replace(/,/g, "")) || 0,
+          단가: parseFloat(cols[len - 4]?.replace(/,/g, "")) || 0,
+          금액: parseFloat(cols[len - 3]?.replace(/,/g, "")) || 0,
+          담당자: cols[len - 2],   // 이우제, 최명균 등 (해외/국내 자동 분류!)
+          상태: cols[len - 1]      // 오른쪽 끝은 고정
         };
-      }).filter(item => item.품목번호); // 필수 데이터 유효성 검사
+      }).filter(item => item.품목번호 && item.품목번호 !== ""); // 빈 데이터 필터링
 
       setShipData(parsedData);
       setParseMsg(`✅ ${parsedData.length}건의 출하의뢰 데이터가 성공적으로 입력되었습니다.`);
