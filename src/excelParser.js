@@ -41,9 +41,11 @@ export const processProdFile = (file, onSuccess, onError) => {
                 prodCode: headers.findIndex(h => h.includes("제품코드"))
             };
 
-            // 원래 있으셨던 날짜 필터링 로직 유지
-            const today = new Date("2026-06-08");
+            // 💡 오늘 기준 -3일부터 끝까지 표시 (3일 이전 과거 데이터는 제외)
+            const today = new Date();
             today.setHours(0, 0, 0, 0);
+            const cutoffDate = new Date(today);
+            cutoffDate.setDate(cutoffDate.getDate() - 3);
 
             const parsedData = raw.slice(headerRowIdx + 1)
                 .map(row => ({
@@ -58,7 +60,7 @@ export const processProdFile = (file, onSuccess, onError) => {
                     if (!item.제품코드) return false;
                     if (item.생산계획일자) {
                         const itemDate = new Date(item.생산계획일자);
-                        if (itemDate < today) return false;
+                        if (itemDate < cutoffDate) return false;
                     } else {
                         return false;
                     }
