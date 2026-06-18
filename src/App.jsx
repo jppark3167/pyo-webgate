@@ -99,11 +99,11 @@ export default function App() {
         return {
           작성일자: cols[0], // 왼쪽 끝은 고정
           납기일자: cols[1],
-          출하번호: cols[len - 10],
+          출하의뢰번호: cols[len - 10],
           거래처명: cols[len - 9],
-          모델명: cols[len - 8],
-          품목번호: cols[len - 7], // 재고 대조용 '품번' (TTA-50DLAF-NTR 등)
-          품목명: cols[len - 6],
+          품목명: cols[len - 8],
+          품목번호: cols[len - 7], // 재고 대조용 '품번' (D-03-01_24676738_UHN-NVR1600-TTA 등)
+          규격: cols[len - 6],     // 규격/사양 (No HDD, 국내향, 16채널 TTA 등)
           수량: parseFloat(cols[len - 5]?.replace(/,/g, "")) || 0,
           단가: parseFloat(cols[len - 4]?.replace(/,/g, "")) || 0,
           금액: parseFloat(cols[len - 3]?.replace(/,/g, "")) || 0,
