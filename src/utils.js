@@ -2,18 +2,18 @@
 //utils.js: 유틸리티 함수 및 상수 정의
 
 // ── 모바일 반응형 CSS ──────────────────────────
-// export const globalCss = `
-//   .swipe-menu { overflow-x: auto; -webkit-overflow-scrolling: touch; -ms-overflow-style: none; scrollbar-width: none; }
-//   .swipe-menu::-webkit-scrollbar { display: none; }
-//   @media (max-width: 640px) {
-//     .header-title { font-size: 14px !important; }
-//     .header-btn { font-size: 11px !important; padding: 5px 10px !important; }
-//     .page-container { padding: 12px 10px !important; }
-//     .stat-btn { font-size: 11px !important; padding: 6px 10px !important; }
-//     .tab-btn { font-size: 12px !important; padding: 10px 10px !important; }
-//     .table-th, .table-td { font-size: 11px !important; padding: 6px 8px !important; }
-//   }
-// `;
+export const globalCss = `
+  .swipe-menu { overflow-x: auto; -webkit-overflow-scrolling: touch; -ms-overflow-style: none; scrollbar-width: none; }
+  .swipe-menu::-webkit-scrollbar { display: none; }
+  @media (max-width: 640px) {
+    .header-title { font-size: 14px !important; }
+    .header-btn { font-size: 11px !important; padding: 5px 10px !important; }
+    .page-container { padding: 12px 10px !important; }
+    .stat-btn { font-size: 11px !important; padding: 6px 10px !important; }
+    .tab-btn { font-size: 12px !important; padding: 10px 10px !important; }
+    .table-th, .table-td { font-size: 11px !important; padding: 6px 8px !important; }
+  }
+`;
 
 // ── 유틸리티 함수 ──────────────────────────────────────────
 export const fmtD = s => s?.length >= 10 ? s.slice(5) : (s || "-");
