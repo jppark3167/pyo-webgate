@@ -1,8 +1,9 @@
-//App.jsx: 메인 애플리케이션 컴포넌트
+// App.jsx: 메인 애플리케이션 컴포넌트
 import { useState, useMemo, useCallback, useEffect } from "react";
-import * as XLSX from "xlsx";
-import { globalCss, loadData, parseExcelDynamic, fmtXlDate, str, num, findInv, shipStatus } from "./utils";
+// 💡 XLSX는 excelParser.js 내부에서 직접 다루므로 여기선 임포트하지 않아 빌드 에러를 방지합니다.
+import { globalCss, loadData, str, findInv } from "./utils";
 import { InputView, DashView } from "./components";
+// 💡 excelParser에서 제공하는 파싱 실행 함수 임포트
 import { processProdFile, processInvFile } from "./excelParser";
 
 export default function App() {
@@ -12,17 +13,17 @@ export default function App() {
 
   const [prodFile, setProdFile] = useState(localStorage.getItem('wg_prodFile') || "");
   const [invFile, setInvFile] = useState(localStorage.getItem('wg_invFile') || "");
-
   const [view, setView] = useState("dash");
+
   const [shipText, setShipText] = useState("");
   const [parseMsg, setParseMsg] = useState(null);
-
   const [mainTab, setMainTab] = useState("ship_dom");
   const [search, setSearch] = useState("");
   const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortDesc, setSortDesc] = useState(false);
-  //임시 커밋용
+
+  // 로컬 스토리지 데이터 동기화
   useEffect(() => {
     localStorage.setItem('wg_prod', JSON.stringify(prodData));
     localStorage.setItem('wg_inv', JSON.stringify(invData));
@@ -31,207 +32,116 @@ export default function App() {
     localStorage.setItem('wg_invFile', invFile);
   }, [prodData, invData, shipData, prodFile, invFile]);
 
+  // 모든 데이터 초기화 핸들러
   const handleResetData = () => {
     if (window.confirm("모든 데이터를 초기화하시겠습니까?")) {
-      setProdData([]); setInvData([]); setShipData([]);
-      setProdFile(""); setInvFile(""); setShipText("");
+      setProdData([]);
+      setInvData([]);
+      setShipData([]);
+      setProdFile("");
+      setInvFile("");
+      setShipText("");
       setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
     }
   };
 
+  // 💡 excelParser의 콜백 구조(file, onSuccess, onError)에 맞게 연동 완료
   const handleProdFile = useCallback(file => {
     setProdFile(file.name);
     setParseMsg("생산계획 파일을 분석 중입니다...");
 
     processProdFile(
       file,
-      (data) => {
-        setProdData(data);
-        setParseMsg(`✅ 생산계획 ${data.length}건이 성공적으로 로드되었습니다.`);
+      (parsedData) => { // onSuccess 콜백
+        setProdData(parsedData);
+        setParseMsg(`✅ 생산계획 파일 분석 완료 (${parsedData.length}건)`);
       },
-      (errorMsg) => {
+      (errorMsg) => { // onError 콜백
         setParseMsg(errorMsg);
       }
     );
   }, []);
 
+  // 💡 중복 선언 오류 해결 및 콜백 구조에 맞게 연동 완료
   const handleInvFile = useCallback(file => {
     setInvFile(file.name);
     setParseMsg("재고현황 파일을 분석 중입니다...");
 
     processInvFile(
       file,
-      (mapped) => {
-        setInvData(mapped);
-        setParseMsg(`✅ 재고현황 ${mapped.length}품목 로드 완료`);
+      (parsedData) => { // onSuccess 콜백
+        setInvData(parsedData);
+        setParseMsg(`✅ 재고현황 파일 분석 완료 (${parsedData.length}건)`);
       },
-      (errorMsg) => {
+      (errorMsg) => { // onError 콜백
         setParseMsg(errorMsg);
       }
     );
   }, []);
 
-  const handleInvFile = useCallback(file => {
-    setInvFile(file.name);
-    setParseMsg("재고 파일을 분석 중입니다...");
-
-    // 재고 데이터에서 반드시 찾아야 할 헤더 키워드 
-    const requiredKeys = ["품번", "재고수량"];
-
-    processExcelFile(
-      file,
-      requiredKeys,
-      (data) => {
-        setInvData(data);
-        setParseMsg(`✅ 재고 파일 업로드 완료 (${data.length}건)`);
-      },
-      (errorMsg) => {
-        setParseMsg(errorMsg);
-      }
-    );
-  }, []);
-
+  // 💡 탭 분리형(TSV) 출하의뢰 복사 텍스트 분석 로직 완벽 적용
   const handleShipParse = () => {
     if (!shipText.trim()) {
       setParseMsg("⚠️ 출하의뢰 텍스트를 입력하세요");
-      return; // 
+      return;
     }
 
     try {
-      // 1. 전체 텍스트를 줄바꿈(\n) 기준으로 분리하여 배열로 만듭니다.
       const rows = shipText.trim().split("\n");
-
-      // 2. 각 줄을 탭(\t) 기준으로 다시 분리하여 객체로 매핑합니다.
       const parsedData = rows.map((row) => {
         const cols = row.split("\t");
-
-        // 샘플 데이터 기준 컬럼 인덱스 매핑
         return {
           작성일자: cols[0]?.trim(),
           납기일자: cols[1]?.trim(),
           출하번호: cols[4]?.trim(),
           거래처명: cols[5]?.trim(),
           모델명: cols[6]?.trim(),
-          품목번호: cols[7]?.trim(), // 재고 매칭 시 핵심 키
+          품목번호: cols[7]?.trim(),
           품목명: cols[8]?.trim(),
-          수량: parseFloat(cols[9]?.replace(/,/g, "")) || 0, // 숫자 변환
+          수량: parseFloat(cols[9]?.replace(/,/g, "")) || 0,
           단가: parseFloat(cols[10]?.replace(/,/g, "")) || 0,
           금액: parseFloat(cols[11]?.replace(/,/g, "")) || 0,
-          담당자: cols[12]?.trim(), // 해외/국내 담당자 분류 키
+          담당자: cols[12]?.trim(),
           상태: cols[13]?.trim()
         };
-      }).filter(item => item.품목번호); // 품목번호가 없는 빈 줄이나 쓰레기값 필터링
+      }).filter(item => item.품목번호); // 필수 데이터 유효성 검사
 
-      // 3. 파싱된 데이터를 상태에 업데이트합니다.
       setShipData(parsedData);
       setParseMsg(`✅ ${parsedData.length}건의 출하의뢰 데이터가 성공적으로 입력되었습니다.`);
-      setShipText(""); // 입력 완료 후 텍스트 에어리어 초기화
-      setView("dash"); // 입력 완료 후 자동으로 대시보드 화면으로 이동 (선택사항)
-
+      setShipText("");
+      setView("dash");
     } catch (error) {
       console.error(error);
       setParseMsg("❌ 파싱 중 오류가 발생했습니다. 데이터 형식을 다시 확인해주세요.");
     }
   };
 
+  // 1. 납기일자 기준 정렬 데이터 생성
   const shipEnriched = useMemo(() => {
-    // ① 납기일자 오름차순으로 출하 데이터 정렬 (순차적 재고 차감을 위함)
-    const sortedShip = [...shipData].sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
+    return [...shipData].sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
+  }, [shipData]);
 
-    // ② 품목별 누적 재고를 관리할 Map 생성 (초기값: 엑셀에서 가져온 현재 재고)
-    const runningInvMap = {};
-    invData.forEach(item => {
-      runningInvMap[str(item.품번).toUpperCase()] = Number(item.재고수량) || 0;
-    });
-
-    // ③ 품목별 생산 계획을 날짜순으로 정리
-    const prodMap = {};
-    prodData.forEach(r => {
-      const code = str(r.제품코드).toUpperCase();
-      if (!prodMap[code]) prodMap[code] = [];
-
-      // 생산계획일자가 없으면 출하일자를 대체 사용
-      const pDate = str(r.생산계획일자 || r.출하일자);
-      const pQty = Number(r.수량 || r.계획수량) || 0;
-      prodMap[code].push({ date: pDate, qty: pQty });
-    });
-
-    // 품목별로 생산 날짜가 빠른 순으로 정렬
-    Object.keys(prodMap).forEach(k => prodMap[k].sort((a, b) => a.date.localeCompare(b.date)));
-
-    // ④ 품목별 생산계획 반영 인덱스 추적기
-    const prodIdxTracker = {};
-
-    // ⑤ 출하 건별 순회하며 재고 시뮬레이션
-    return sortedShip.map(ship => {
-      const code = str(ship.품목번호).toUpperCase();
-      const shipDate = str(ship.납기일자);
-      const reqQty = Number(ship.수량) || 0;
-
-      const baseInv = invData.find(r => str(r.품번).toUpperCase() === code);
-      const currentInvQty = baseInv ? Number(baseInv.재고수량) : null;
-
-      if (runningInvMap[code] === undefined) runningInvMap[code] = 0;
-
-      let addedProdQtyThisStep = 0;
-      if (prodMap[code]) {
-        if (prodIdxTracker[code] === undefined) prodIdxTracker[code] = 0;
-
-        while (prodIdxTracker[code] < prodMap[code].length) {
-          const pItem = prodMap[code][prodIdxTracker[code]];
-          if (pItem.date <= shipDate) {
-            runningInvMap[code] += pItem.qty;
-            addedProdQtyThisStep += pItem.qty;
-            prodIdxTracker[code]++;
-          } else {
-            break;
-          }
-        }
-      }
-
-      // 💡 핵심 로직: 상태가 '완료'가 아닌 경우에만 예상 재고에서 수량을 뺌!
-      // (이미 완료된 건은 전산 현재고에 차감이 반영되어 있으므로 이중으로 빼지 않음)
-      if (ship.상태 !== "완료") {
-        runningInvMap[code] -= reqQty;
-      }
-
-      const projectedInvQty = runningInvMap[code];
-
-      let status = projectedInvQty >= 0 ? "ok" : "shortage";
-      if (currentInvQty === null) status = "unknown";
-
-      // 💡 상태가 '완료'인 건은 뱃지 상태를 강제로 'completed'로 덮어씌움
-      if (ship.상태 === "완료") status = "completed";
-
-      return {
-        ...ship,
-        _currentInvQty: currentInvQty,
-        _incomingProd: addedProdQtyThisStep,
-        // 💡 완료된 건은 다음 예상재고 흐름에 혼선을 주지 않도록 표기를 "-" 로 처리
-        _projectedInvQty: ship.상태 === "완료" ? "-" : projectedInvQty,
-        _status: status
-      };
-    });
-  }, [shipData, invData, prodData]);
-
+  // 해외/국내 담당자별 출하의뢰 데이터 분리
   const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => ["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
   const shipDomEnriched = useMemo(() => shipEnriched.filter(r => !["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
 
+  // 생산 데이터 재고 매칭 및 상태 고정
   const prodEnriched = useMemo(() => prodData.map(r => {
     const inv = findInv(invData, r.제품코드);
-    return {
-      ...r, _inv: inv, _status: "prod_planned"
-      // 💡 재고부족 대신 '생산예정'으로 고정
-    };
+    return { ...r, _inv: inv, _status: "prod_planned" }; // '생산예정'으로 상태 고정
   }), [prodData, invData]);
 
+  // 탭 상태 및 변경에 따른 실시간 통계 생성
   const prodStats = useMemo(() => {
-    const c = { ok: 0, shortage: 0, neg: 0, unknown: 0 };
+    const c = { ok: 0, shortage: 0, neg: 0, unknown: 0, prod_planned: 0 };
     const activeData = mainTab === 'ship_dom' ? shipDomEnriched : (mainTab === 'ship_ovs' ? shipOvsEnriched : prodEnriched);
-    activeData.forEach(r => c[r._status]++);
+    activeData.forEach(r => {
+      if (r._status && c[r._status] !== undefined) c[r._status]++;
+    });
     return c;
   }, [prodEnriched, shipDomEnriched, shipOvsEnriched, mainTab]);
 
+  // 출하 통합 검색 필터 로직
   const filterShipData = (data) => {
     const q = search.toLowerCase();
     return data.filter(r =>
@@ -244,6 +154,7 @@ export default function App() {
   const filteredShipDom = useMemo(() => filterShipData(shipDomEnriched), [shipDomEnriched, search, filterDate, filterStatus]);
   const filteredShipOvs = useMemo(() => filterShipData(shipOvsEnriched), [shipOvsEnriched, search, filterDate, filterStatus]);
 
+  // 생산 통합 검색 필터 로직
   const filteredProd = useMemo(() => {
     const q = search.toLowerCase();
     return prodEnriched.filter(r =>
@@ -253,14 +164,20 @@ export default function App() {
     );
   }, [prodEnriched, search, filterDate, filterStatus]);
 
+  // 마이너스 재고 필터링 리스트
   const negInvList = useMemo(() => invData.filter(r => r.재고수량 < 0), [invData]);
-  const filteredNegInv = useMemo(() => negInvList.filter(r => !search || r.품번?.toLowerCase().includes(search.toLowerCase()) || r.품명?.toLowerCase().includes(search.toLowerCase())), [negInvList, search]);
+  const filteredNegInv = useMemo(() => negInvList.filter(r =>
+    !search || r.품번?.toLowerCase().includes(search.toLowerCase()) || r.품명?.toLowerCase().includes(search.toLowerCase())
+  ), [negInvList, search]);
 
+  // 그리드 날짜별 데이터 정렬 헬퍼
   const sortShipData = (data) => {
     return [...data].sort((a, b) => {
-      const vA = a.납기일자; const vB = b.납기일자;
+      const vA = a.납기일자;
+      const vB = b.납기일자;
       if (!vA && !vB) return 0;
-      if (!vA) return 1; if (!vB) return -1;
+      if (!vA) return 1;
+      if (!vB) return -1;
       return sortDesc ? vB.localeCompare(vA) : vA.localeCompare(vB);
     });
   };
@@ -270,14 +187,16 @@ export default function App() {
 
   const sortedProd = useMemo(() => {
     return [...filteredProd].sort((a, b) => {
-      const vA = a.출하일자; const vB = b.출하일자;
+      const vA = a.출하일자;
+      const vB = b.출하일자;
       if (!vA && !vB) return 0;
-      if (!vA) return 1; if (!vB) return -1;
+      if (!vA) return 1;
+      if (!vB) return -1;
       return sortDesc ? vB.localeCompare(vA) : vA.localeCompare(vB);
     });
   }, [filteredProd, sortDesc]);
 
-  // 💡 [추가됨] 날짜별 생산/출하 요약 데이터 생성
+  // 날짜별 종합 요약 맵 생성
   const dailySummaryData = useMemo(() => {
     const summaryMap = {};
     prodEnriched.forEach(item => {
@@ -297,37 +216,64 @@ export default function App() {
 
   return (
     <>
-      <style>{globalCss}</style>
+      {globalCss}
       <div style={{ fontFamily: "'Pretendard','Malgun Gothic',sans-serif", background: "#f1f5f9", minHeight: "100vh" }}>
+
+        {/* 상단 통합 내비게이션 바 */}
         <div style={{ background: "#1e3a5f", color: "#fff", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 18 }}>🏭</span>
-            <div><div className="header-title" style={{ fontWeight: 700, fontSize: 15 }}>출하 일정관리</div></div>
+            <div className="header-title" style={{ fontWeight: 700, fontSize: 15 }}>출하 일정관리</div>
           </div>
-          <button className="header-btn" onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }} style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+          <button
+            className="header-btn"
+            onClick={() => {
+              setView(view === "input" ? "dash" : "input");
+              setParseMsg(null);
+            }}
+            style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+          >
             {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
           </button>
         </div>
 
-        {view === "input" ? (
-          <InputView
-            setView={setView} handleResetData={handleResetData} parseMsg={parseMsg}
-            handleProdFile={handleProdFile} prodData={prodData} prodFile={prodFile}
-            handleInvFile={handleInvFile} invData={invData} invFile={invFile}
-            shipText={shipText} setShipText={setShipText} handleShipParse={handleShipParse}
-          />
-        ) : (
-          <DashView
-            mainTab={mainTab} setMainTab={setMainTab}
-            shipDomEnriched={shipDomEnriched} shipOvsEnriched={shipOvsEnriched} prodEnriched={prodEnriched}
-            prodStats={prodStats} filterStatus={filterStatus} setFilterStatus={setFilterStatus}
-            search={search} setSearch={setSearch} sortDesc={sortDesc} setSortDesc={setSortDesc}
-            sortedShipDom={sortedShipDom} sortedShipOvs={sortedShipOvs} sortedProd={sortedProd}
-            filteredNegInv={filteredNegInv} negInvList={negInvList}
-            // 💡 [추가됨] DashView로 요약 데이터를 넘겨줍니다.
-            dailySummaryData={dailySummaryData}
-          />
-        )}
+        {/* 렌더링 컨테이너 화면 뷰포트 분기 */}
+        <div className="page-container" style={{ padding: "16px" }}>
+          {view === "input" ? (
+            <InputView
+              setView={setView}
+              handleResetData={handleResetData}
+              parseMsg={parseMsg}
+              handleProdFile={handleProdFile}
+              prodData={prodData}
+              prodFile={prodFile}
+              handleInvFile={handleInvFile}
+              invData={invData}
+              invFile={invFile}
+              shipText={shipText}
+              setShipText={setShipText}
+              handleShipParse={handleShipParse}
+            />
+          ) : (
+            <DashView
+              mainTab={mainTab}
+              setMainTab={setMainTab}
+              prodStats={prodStats}
+              filterStatus={filterStatus}
+              setFilterStatus={setFilterStatus}
+              search={search}
+              setSearch={setSearch}
+              sortDesc={sortDesc}
+              setSortDesc={setSortDesc}
+              sortedShipDom={sortedShipDom}
+              sortedShipOvs={sortedShipOvs}
+              sortedProd={sortedProd}
+              filteredNegInv={filteredNegInv}
+              negInvList={negInvList}
+              dailySummaryData={dailySummaryData}
+            />
+          )}
+        </div>
       </div>
     </>
   );
