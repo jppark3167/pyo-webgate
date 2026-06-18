@@ -248,7 +248,7 @@ export default function App() {
 
   return (
     <>
-      {globalCss}
+      <style>{globalCss}</style>
       <div style={{ fontFamily: "'Pretendard','Malgun Gothic',sans-serif", background: "#f1f5f9", minHeight: "100vh" }}>
 
         {/* 상단 통합 내비게이션 바 */}
