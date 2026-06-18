@@ -75,6 +75,7 @@ export const processProdFile = (file, onSuccess, onError) => {
 };
 
 // 📦 재고현황 파일 파싱 로직
+// 📦 재고현황 파일 파싱 로직 (개선본)
 export const processInvFile = (file, onSuccess, onError) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -83,25 +84,62 @@ export const processInvFile = (file, onSuccess, onError) => {
             const ws = wb.Sheets[wb.SheetNames[0]];
             const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-            // 유틸리티 함수의 동적 파싱 적용
-            const parsed = parseExcelDynamic(raw, [
-                ["품번", "품목코드", "품목번호", "제품코드", "ITEM_CODE"],
-                ["재고수량", "현재고", "수량", "재고", "실재고"]
-            ]);
-
-            const mapped = parsed.map(r => ({
-                품번: str(r["품번"] || r["품목코드"] || r["품목번호"] || r["제품코드"] || r["ITEM_CODE"]),
-                품명: str(r["품명"] || r["품목명"] || r["ITEM_NAME"] || r["제품명"]),
-                규격: str(r["규격"] || r["SPEC"] || r["스펙"]),
-                재고수량: num(r["재고수량"] || r["현재고"] || r["수량"] || r["재고"] || r["실재고"]),
-            })).filter(r => r.품번);
-
-            if (mapped.length > 0) {
-                onSuccess(mapped);
-            } else {
-                onError("⚠️ 재고현황 데이터를 찾을 수 없습니다.");
+            if (raw.length < 2) {
+                onError("⚠️ 데이터가 충분하지 않거나 양식이 잘못되었습니다.");
+                return;
             }
+
+            let headerRowIdx = -1;
+            let headers = [];
+
+            // 1. 최대 20번째 줄까지 탐색하여 실제 헤더(제목 표시줄) 찾기
+            for (let i = 0; i < Math.min(20, raw.length); i++) {
+                // 공백을 제거하여 비교를 쉽게 만듦
+                const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : "");
+
+                // '품번' 관련 단어와 '재고' 관련 단어가 모두 있는 줄을 헤더로 인식
+                const hasItemCode = currentRow.some(h => h.includes("품번") || h.includes("품목코드") || h.includes("제품코드") || h.toUpperCase().includes("ITEM"));
+                const hasQty = currentRow.some(h => h.includes("재고") || h.includes("수량") || h.includes("현재고"));
+
+                if (hasItemCode && hasQty) {
+                    headerRowIdx = i;
+                    headers = currentRow;
+                    break;
+                }
+            }
+
+            if (headerRowIdx === -1) {
+                onError("❌ 필수 헤더(품번, 재고수량 등)를 찾을 수 없습니다. 엑셀 양식을 확인해주세요.");
+                return;
+            }
+
+            // 2. 정확한 컬럼 인덱스 찾기
+            const idx = {
+                itemCode: headers.findIndex(h => h.includes("품번") || h.includes("품목코드") || h.includes("제품코드") || h.toUpperCase().includes("ITEM")),
+                itemName: headers.findIndex(h => h.includes("품명") || h.includes("제품명") || h.toUpperCase().includes("NAME")),
+                spec: headers.findIndex(h => h.includes("규격") || h.toUpperCase().includes("SPEC")),
+                qty: headers.findIndex(h => h.includes("재고") || h.includes("수량") || h.includes("현재고"))
+            };
+
+            // 3. 데이터 매핑 및 필터링
+            const parsedData = raw.slice(headerRowIdx + 1)
+                .map(row => ({
+                    품번: idx.itemCode !== -1 ? str(row[idx.itemCode]) : "",
+                    품명: idx.itemName !== -1 ? str(row[idx.itemName]) : "",
+                    규격: idx.spec !== -1 ? str(row[idx.spec]) : "",
+                    재고수량: idx.qty !== -1 ? num(row[idx.qty]) : 0,
+                }))
+                .filter(item => item.품번); // 품번이 없는 빈 줄이나 쓰레기값 필터링
+
+            // 4. 결과 반환
+            if (parsedData.length > 0) {
+                onSuccess(parsedData);
+            } else {
+                onError("⚠️ 유효한 재고현황 데이터를 찾을 수 없습니다.");
+            }
+
         } catch (err) {
+            console.error("Inv Parsing Error:", err);
             onError("❌ 재고현황 파싱 오류: " + err.message);
         }
     };
