@@ -240,7 +240,7 @@ export function DashView({
                                             {item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
                                         </td>
                                         <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
-                                            {item._projectedInvQty ?? "-"}
+                                            {item._projectedDisplay ?? "-"}
                                         </td>
                                         <td style={tdStyle}>{renderStatusBadge(item._status)}</td>
                                         <td style={{ ...tdStyle, color: "#64748b", fontSize: "0.6875rem" }}>{item.출하의뢰번호}</td>

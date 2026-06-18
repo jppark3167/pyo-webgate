@@ -122,10 +122,36 @@ export default function App() {
     }
   };
 
-  // 1. 납기일자 기준 정렬 데이터 생성
+  // 제품코드별 생산계획 수량 합계 맵 (출하의뢰 품목번호 매칭용)
+  const prodQtyMap = useMemo(() => {
+    const map = {};
+    prodData.forEach(item => {
+      const code = str(item.제품코드).toUpperCase();
+      if (!code) return;
+      map[code] = (map[code] || 0) + (item.수량 || 0);
+    });
+    return map;
+  }, [prodData]);
+
+  // 1. 납기일자 기준 정렬 + 현재고/생산예정/예상재고 매칭 데이터 생성
   const shipEnriched = useMemo(() => {
-    return [...shipData].sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
-  }, [shipData]);
+    return [...shipData]
+      .map(r => {
+        const inv = findInv(invData, r.품목번호);
+        const currentInv = inv ? inv.재고수량 : 0;                          // 현재고: 재고 데이터, 없으면 0
+        const incomingProd = prodQtyMap[str(r.품목번호).toUpperCase()] || 0; // 생산예정: 생산계획 데이터, 없으면 0
+        const projected = currentInv + incomingProd;                       // 예상재고 = 현재고 + 생산예정
+
+        return {
+          ...r,
+          _currentInvQty: currentInv,
+          _incomingProd: incomingProd,
+          _projectedInvQty: projected,
+          _projectedDisplay: `${currentInv} + ${incomingProd}`, // "현재고 + 생산예정" 형식 표기
+        };
+      })
+      .sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
+  }, [shipData, invData, prodQtyMap]);
 
   // 해외/국내 담당자별 출하의뢰 데이터 분리
   const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => ["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
