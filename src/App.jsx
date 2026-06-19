@@ -122,13 +122,17 @@ export default function App() {
     }
   };
 
-  // 제품코드별 생산계획 수량 합계 맵 (출하의뢰 품목번호 매칭용)
+  // 제품코드별 생산계획 수량 합계 + 날짜 맵 (출하의뢰 품목번호 매칭용)
   const prodQtyMap = useMemo(() => {
     const map = {};
     prodData.forEach(item => {
       const code = str(item.제품코드).toUpperCase();
       if (!code) return;
-      map[code] = (map[code] || 0) + (item.수량 || 0);
+      if (!map[code]) map[code] = { qty: 0, dates: [] };
+      map[code].qty += (item.수량 || 0);
+      if (item.생산계획일자 && !map[code].dates.includes(item.생산계획일자)) {
+        map[code].dates.push(item.생산계획일자);
+      }
     });
     return map;
   }, [prodData]);
@@ -137,24 +141,48 @@ export default function App() {
   const shipEnriched = useMemo(() => {
     return [...shipData]
       .map(r => {
+        // 운반비는 재고 계산 불필요 → 모든 재고/상태 필드 빈값으로 처리
+        const isCarriage = str(r.품목명).includes("운반비");
+        if (isCarriage) {
+          return {
+            ...r,
+            _currentInvQty: null,
+            _incomingProd: 0,
+            _prodDates: [],
+            _projectedInvQty: null,
+            _projectedDisplay: "-",
+            _status: "skip",
+            _note: null,
+          };
+        }
+
         const inv = findInv(invData, r.품목번호);
-        const currentInv = inv ? inv.재고수량 : 0;                          // 현재고: 재고 데이터, 없으면 0
-        const incomingProd = prodQtyMap[str(r.품목번호).toUpperCase()] || 0; // 생산예정: 생산계획 데이터, 없으면 0
-        const projected = currentInv + incomingProd;                       // 예상재고 = 현재고 + 생산예정
+        const currentInv = inv ? inv.재고수량 : 0;
+        const prodInfo = prodQtyMap[str(r.품목번호).toUpperCase()];
+        const incomingProd = prodInfo ? prodInfo.qty : 0;
+        const prodDates = prodInfo ? [...prodInfo.dates].sort() : [];
+        const projected = currentInv + incomingProd;
 
         // 상태 판정: 예상재고 - 의뢰수량 > 0 이면 이상없음, < 0 이면 재고부족
         // 완료 건은 이미 재고에 반영된 것으로 보고 의뢰수량을 다시 차감하지 않음(=0 처리)
         const effectiveDemand = str(r.상태) === "완료" ? 0 : r.수량;
         const diff = projected - effectiveDemand;
-        const computedStatus = diff < 0 ? "shortage" : "ok"; // > 0(또는 0) 이상없음 / < 0 재고부족
+        const computedStatus = diff < 0 ? "shortage" : "ok";
+
+        // 비고: K/KT/NK로 시작하는 품번이면서 재고가 없는 경우 KCE 입고일정 확인 필요
+        const codeUpper = str(r.품목번호).toUpperCase();
+        const isKCE = /^(NK|KT|K)/.test(codeUpper) && currentInv <= 0;
+        const note = isKCE ? "KCE입고일정 확인 필요" : null;
 
         return {
           ...r,
           _currentInvQty: currentInv,
           _incomingProd: incomingProd,
+          _prodDates: prodDates,
           _projectedInvQty: projected,
-          _projectedDisplay: `${currentInv} + ${incomingProd}`, // "현재고 + 생산예정" 형식 표기
+          _projectedDisplay: `${currentInv} + ${incomingProd}`,
           _status: computedStatus,
+          _note: note,
         };
       })
       .sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));

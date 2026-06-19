@@ -71,6 +71,8 @@ export function renderStatusBadge(status) {
             return <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>생산예정</span>;
         case "completed":
             return <span style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>선발행</span>;
+        case "skip":
+            return <span style={{ color: "#cbd5e1", fontSize: "0.7rem" }}>-</span>;
         default:
             return <span style={{ background: "#f1f5f9", color: "#475569", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>미등록</span>;
     }
@@ -193,6 +195,7 @@ export function DashView({
                                     <th style={thStyle}>상태</th>
                                     <th style={thStyle}>의뢰번호</th>
                                     <th style={thStyle}>담당</th>
+                                    <th style={thStyle}>비고</th>
                                 </>
                             )}
                             {mainTab === "prod" && (
@@ -249,6 +252,18 @@ export function DashView({
                                         <td style={tdStyle}>{renderStatusBadge(item._status)}</td>
                                         <td style={{ ...tdStyle, color: "#64748b", fontSize: "0.6875rem" }}>{item.출하의뢰번호}</td>
                                         <td style={tdStyle}>{item.담당자}</td>
+                                        <td style={{ ...tdStyle, fontSize: "0.6875rem" }}>
+                                            {item._note
+                                                ? <span style={{ color: "#d97706", fontWeight: "600" }}>{item._note}</span>
+                                                : item._prodDates && item._prodDates.length > 0
+                                                    ? item._prodDates.map((d, i) => (
+                                                        <div key={i} style={{ whiteSpace: "nowrap", color: "#2563eb" }}>
+                                                            {d.slice(5)} 생산완료
+                                                        </div>
+                                                    ))
+                                                    : <span style={{ color: "#cbd5e1" }}>-</span>
+                                            }
+                                        </td>
                                     </>
                                 )}
                                 {mainTab === "prod" && (
