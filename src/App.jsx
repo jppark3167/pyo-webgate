@@ -264,7 +264,21 @@ export default function App() {
     });
   }, [filteredProd, sortDesc]);
 
-  // 날짜별(납기일자) 출하 종합 요약 맵 생성
+  // 날짜별 생산계획 요약 맵 생성 (이중탭용)
+  const prodSummaryData = useMemo(() => {
+    const map = {};
+    sortedProd.forEach(item => {
+      const date = item.생산계획일자 || "날짜미정";
+      if (!map[date]) map[date] = { 생산계획일자: date, 건수: 0, 총수량: 0 };
+      map[date].건수 += 1;
+      map[date].총수량 += item.수량 || 0;
+    });
+    return Object.values(map).sort((a, b) => {
+      if (a.생산계획일자 === "날짜미정") return 1;
+      if (b.생산계획일자 === "날짜미정") return -1;
+      return a.생산계획일자.localeCompare(b.생산계획일자);
+    });
+  }, [sortedProd]);
   const dailySummaryData = useMemo(() => {
     const summaryMap = {};
     shipEnriched.forEach(item => {
@@ -336,6 +350,7 @@ export default function App() {
               sortedShipDom={sortedShipDom}
               sortedShipOvs={sortedShipOvs}
               sortedProd={sortedProd}
+              prodSummaryData={prodSummaryData}
               filteredNegInv={filteredNegInv}
               negInvList={negInvList}
               dailySummaryData={dailySummaryData}
