@@ -255,8 +255,8 @@ export default function App() {
 
   const sortedProd = useMemo(() => {
     return [...filteredProd].sort((a, b) => {
-      const vA = a.출하일자;
-      const vB = b.출하일자;
+      const vA = a.생산계획일자;
+      const vB = b.생산계획일자;
       if (!vA && !vB) return 0;
       if (!vA) return 1;
       if (!vB) return -1;

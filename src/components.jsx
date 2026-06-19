@@ -27,8 +27,8 @@ const activeTabStyle = {
 const tableStyle = {
     width: "100%",
     borderCollapse: "collapse",
-    fontSize: "0.75rem" // 약 12px로 축소하여 한 화면에 많은 데이터 수용
-    // 💡 minWidth: "max-content" 삭제 -> 테이블이 화면 너비(100%)에 맞춰지도록 변경
+    fontSize: "0.75rem",
+    tableLayout: "fixed"  // 💡 고정 레이아웃으로 컬럼 너비 제어
 };
 
 const theadTrStyle = {
@@ -37,11 +37,12 @@ const theadTrStyle = {
 };
 
 const thStyle = {
-    padding: "0.4rem 0.25rem", // 여백 대폭 축소
+    padding: "0.45rem 0.4rem",
     fontWeight: "600",
     color: "#475569",
     textAlign: "center",
-    wordBreak: "keep-all" // 💡 한글 단어 단위로 자연스럽게 줄바꿈 허용 (whiteSpace: nowrap 삭제)
+    whiteSpace: "nowrap",
+    overflow: "hidden"
 };
 
 const tbodyTrStyle = {
@@ -49,11 +50,12 @@ const tbodyTrStyle = {
 };
 
 const tdStyle = {
-    padding: "0.4rem 0.25rem", // 여백 대폭 축소
+    padding: "0.45rem 0.4rem",
     color: "#334155",
     textAlign: "center",
     verticalAlign: "middle",
-    wordBreak: "break-word" // 💡 긴 영어/숫자(품번 등)가 셀을 뚫고 나가지 않게 줄바꿈 허용
+    overflow: "hidden",
+    wordBreak: "break-word"
 };
 
 // ==========================================
@@ -185,17 +187,17 @@ export function DashView({
                         <tr>
                             {mainTab.includes("ship") && (
                                 <>
-                                    <th style={thStyle}>납기일자</th>
-                                    <th style={thStyle}>의뢰처명</th>
-                                    <th style={{ ...thStyle, width: "25%" }}>품목명 / 규격</th> {/* 넓은 공간 할당 */}
-                                    <th style={thStyle}>의뢰수량</th>
-                                    <th style={thStyle}>현재고</th>
-                                    <th style={thStyle}>생산예정</th>
-                                    <th style={thStyle}>예상재고</th>
-                                    <th style={thStyle}>상태</th>
-                                    <th style={thStyle}>의뢰번호</th>
-                                    <th style={thStyle}>담당</th>
-                                    <th style={thStyle}>비고</th>
+                                    <th style={{ ...thStyle, width: "6%" }}>납기일자</th>
+                                    <th style={{ ...thStyle, width: "12%" }}>의뢰처명</th>
+                                    <th style={{ ...thStyle, width: "20%", textAlign: "left", paddingLeft: "0.5rem" }}>품목명</th>
+                                    <th style={{ ...thStyle, width: "5%" }}>수량</th>
+                                    <th style={{ ...thStyle, width: "6%" }}>현재고</th>
+                                    <th style={{ ...thStyle, width: "8%" }}>생산예정</th>
+                                    <th style={{ ...thStyle, width: "9%" }}>예상재고</th>
+                                    <th style={{ ...thStyle, width: "7%" }}>상태</th>
+                                    <th style={{ ...thStyle, width: "10%" }}>의뢰번호</th>
+                                    <th style={{ ...thStyle, width: "5%" }}>담당</th>
+                                    <th style={{ ...thStyle, width: "12%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
                                 </>
                             )}
                             {mainTab === "prod" && (
@@ -232,36 +234,35 @@ export function DashView({
                             <tr key={idx} style={tbodyTrStyle}>
                                 {mainTab.includes("ship") && (
                                     <>
-                                        <td style={tdStyle}>{item.납기일자}</td>
-                                        <td style={{ ...tdStyle, fontWeight: "600" }}>{item.거래처명}</td>
-                                        <td style={{ ...tdStyle, textAlign: "left" }}>
-                                            <div style={{ fontWeight: "600" }}>{item.품목명}</div>
-                                            <div style={{ fontSize: "0.6875rem", color: "#64748b", marginTop: "2px" }}>{item.규격} <br />({item.품목번호})</div>
+                                        <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{item.납기일자}</td>
+                                        <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
+                                        <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
+                                            <div style={{ fontWeight: "600", wordBreak: "break-all" }}>{item.품목명}</div>
+                                            <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "2px", wordBreak: "break-all" }}>{item.품목번호}</div>
                                         </td>
-                                        <td style={{ ...tdStyle, fontWeight: "600" }}>{item.수량}</td>
-                                        <td style={tdStyle}>{item._currentInvQty ?? "-"}</td>
+                                        <td style={{ ...tdStyle, fontWeight: "600", whiteSpace: "nowrap" }}>{item.수량}</td>
+                                        <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item._currentInvQty ?? "-"}</td>
                                         <td style={{ ...tdStyle, color: item._incomingProd > 0 ? "#2563eb" : "#94a3b8" }}>
-                                            {item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
+                                            <div style={{ whiteSpace: "nowrap" }}>{item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}</div>
+                                            {item._prodDates && item._prodDates.length > 0 && item._prodDates.map((d, i) => (
+                                                <div key={i} style={{ fontSize: "0.6rem", color: "#93c5fd", marginTop: "2px", whiteSpace: "nowrap" }}>
+                                                    {d.slice(5)} 생산완료
+                                                </div>
+                                            ))}
                                         </td>
                                         <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
-                                            <div>{item._projectedInvQty ?? "-"}</div>
-                                            <div style={{ fontSize: "0.6875rem", fontWeight: "400", color: "#94a3b8", marginTop: "2px" }}>
+                                            <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
+                                            <div style={{ fontSize: "0.65rem", fontWeight: "400", color: "#94a3b8", marginTop: "2px", whiteSpace: "nowrap" }}>
                                                 {item._projectedDisplay}
                                             </div>
                                         </td>
-                                        <td style={tdStyle}>{renderStatusBadge(item._status)}</td>
-                                        <td style={{ ...tdStyle, color: "#64748b", fontSize: "0.6875rem" }}>{item.출하의뢰번호}</td>
-                                        <td style={tdStyle}>{item.담당자}</td>
-                                        <td style={{ ...tdStyle, fontSize: "0.6875rem" }}>
+                                        <td style={{ ...tdStyle }}>{renderStatusBadge(item._status)}</td>
+                                        <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "0.65rem", wordBreak: "break-all" }}>{item.출하의뢰번호}</td>
+                                        <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
+                                        <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
                                             {item._note
-                                                ? <span style={{ color: "#d97706", fontWeight: "600" }}>{item._note}</span>
-                                                : item._prodDates && item._prodDates.length > 0
-                                                    ? item._prodDates.map((d, i) => (
-                                                        <div key={i} style={{ whiteSpace: "nowrap", color: "#2563eb" }}>
-                                                            {d.slice(5)} 생산완료
-                                                        </div>
-                                                    ))
-                                                    : <span style={{ color: "#cbd5e1" }}>-</span>
+                                                ? <span style={{ color: "#d97706", fontWeight: "600", wordBreak: "keep-all" }}>{item._note}</span>
+                                                : <span style={{ color: "#cbd5e1" }}>-</span>
                                             }
                                         </td>
                                     </>
