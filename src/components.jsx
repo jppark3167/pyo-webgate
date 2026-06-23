@@ -73,6 +73,8 @@ export function renderStatusBadge(status) {
             return <span style={{ background: "#e0f2fe", color: "#0284c7", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>생산예정</span>;
         case "completed":
             return <span style={{ background: "#e5e7eb", color: "#4b5563", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>선발행</span>;
+        case "kce_scheduled":
+            return <span style={{ background: "#ede9fe", color: "#6d28d9", padding: "3px 6px", borderRadius: "4px", fontSize: "0.7rem", fontWeight: "600" }}>KCE 입고예정</span>;
         case "skip":
             return <span style={{ color: "#cbd5e1", fontSize: "0.7rem" }}>-</span>;
         default:
@@ -350,7 +352,7 @@ export function DashView({
                                                             const isEditing = editingKey === memoKey;
                                                             const memoVal = memos[memoKey] || "";
                                                             return (
-                                                                <tr key={di} style={{ ...tbodyTrStyle, background: d._status === "shortage" ? "#fffbeb" : undefined }}>
+                                                                <tr key={di} style={{ ...tbodyTrStyle, background: (d._note && memoVal) ? "#f5f3ff" : d._status === "shortage" ? "#fffbeb" : undefined }}>
                                                                     <td style={{ ...tdStyle, fontWeight: "600" }}>{d.거래처명}</td>
                                                                     <td style={{ ...tdStyle, textAlign: "left" }}>
                                                                         <div style={{ fontWeight: "600" }}>{d.품목명}</div>
@@ -358,7 +360,9 @@ export function DashView({
                                                                     </td>
                                                                     <td style={tdStyle}>{d.수량}</td>
                                                                     <td style={tdStyle}>{d.담당자}</td>
-                                                                    <td style={tdStyle}>{renderStatusBadge(d._status)}</td>
+                                                                    <td style={tdStyle}>{renderStatusBadge(
+                                                                        (d._note && memoVal) ? "kce_scheduled" : d._status
+                                                                    )}</td>
                                                                     <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.4rem" }}>
                                                                         {isEditing ? (
                                                                             <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
