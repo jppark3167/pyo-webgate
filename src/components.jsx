@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { fmtD } from "./utils";
 
 // ==========================================
 // 1. 공통 인라인 스타일 정의 (한눈에 보기 최적화)
@@ -141,11 +142,10 @@ export function DashView({
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedProdDate, setSelectedProdDate] = useState(null);
 
-    // 메모 상태: { [출하의뢰번호]: "메모 텍스트" }
     const [memos, setMemos] = useState(() => {
         try { return JSON.parse(localStorage.getItem('wg_memos') || '{}'); } catch { return {}; }
     });
-    const [editingKey, setEditingKey] = useState(null); // 현재 편집 중인 의뢰번호
+    const [editingKey, setEditingKey] = useState(null);
 
     const saveMemo = (key, value) => {
         const updated = { ...memos, [key]: value };
@@ -231,7 +231,7 @@ export function DashView({
                         {/* 출하 탭 렌더링 */}
                         {mainTab.includes("ship") && activeData.map((item, idx) => (
                             <tr key={idx} style={tbodyTrStyle}>
-                                <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{item.납기일자}</td>
+                                <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{fmtD(item.납기일자)}</td>
                                 <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
                                 <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
                                     <div style={{ fontWeight: "600", wordBreak: "break-all" }}>{item.품목명}</div>
@@ -282,22 +282,22 @@ export function DashView({
                                                 <table style={{ ...tableStyle, tableLayout: "fixed" }}>
                                                     <thead>
                                                         <tr style={{ background: "#eef2f7" }}>
-                                                            <th style={{ ...thStyle, width: "35%", textAlign: "left", paddingLeft: "0.75rem" }}>모델명</th>
-                                                            <th style={{ ...thStyle, width: "30%", textAlign: "left", paddingLeft: "0.5rem" }}>고객명</th>
+                                                            <th style={{ ...thStyle, width: "20%", textAlign: "left", paddingLeft: "0.75rem" }}>출하일자</th>
+                                                            <th style={{ ...thStyle, width: "25%", textAlign: "left", paddingLeft: "0.5rem" }}>고객명</th>
+                                                            <th style={{ ...thStyle, width: "40%", textAlign: "left", paddingLeft: "0.5rem" }}>모델명</th>
                                                             <th style={{ ...thStyle, width: "15%" }}>수량</th>
-                                                            <th style={{ ...thStyle, width: "20%" }}>출하일자</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
                                                         {detailItems.map((d, di) => (
                                                             <tr key={di} style={tbodyTrStyle}>
-                                                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.75rem" }}>
+                                                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.75rem", fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>{fmtD(d.출하일자) || "-"}</td>
+                                                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{d.고객명}</td>
+                                                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
                                                                     <div style={{ fontWeight: "600" }}>{d.모델명}</div>
                                                                     <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "2px" }}>{d.제품코드}</div>
                                                                 </td>
-                                                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{d.고객명}</td>
                                                                 <td style={{ ...tdStyle, fontWeight: "600" }}>{d.수량}</td>
-                                                                <td style={{ ...tdStyle, fontSize: "0.7rem", color: "#64748b" }}>{d.출하일자 || "-"}</td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
