@@ -136,16 +136,27 @@ export function InputView({
 export function DashView({
     mainTab, setMainTab, prodStats, filterStatus, setFilterStatus, search, setSearch,
     sortDesc, setSortDesc, sortedShipDom, sortedShipOvs, sortedProd, prodSummaryData = [],
-    filteredNegInv, negInvList, dailySummaryData = [], allShipData = []
+    dailySummaryData = [], allShipData = []
 }) {
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedProdDate, setSelectedProdDate] = useState(null);
+
+    // 메모 상태: { [출하의뢰번호]: "메모 텍스트" }
+    const [memos, setMemos] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('wg_memos') || '{}'); } catch { return {}; }
+    });
+    const [editingKey, setEditingKey] = useState(null); // 현재 편집 중인 의뢰번호
+
+    const saveMemo = (key, value) => {
+        const updated = { ...memos, [key]: value };
+        setMemos(updated);
+        localStorage.setItem('wg_memos', JSON.stringify(updated));
+    };
 
     let activeData = [];
     if (mainTab === "ship_dom") activeData = sortedShipDom;
     else if (mainTab === "ship_ovs") activeData = sortedShipOvs;
     else if (mainTab === "prod") activeData = sortedProd;
-    else if (mainTab === "neg") activeData = filteredNegInv;
 
     return (
         <div style={{ padding: "0.5rem" }}>
@@ -155,11 +166,10 @@ export function DashView({
                 <button style={mainTab === "ship_ovs" ? activeTabStyle : tabStyle} onClick={() => setMainTab("ship_ovs")}>✈️ 해외 출하의뢰</button>
                 <button style={mainTab === "prod" ? activeTabStyle : tabStyle} onClick={() => setMainTab("prod")}>📋 생산계획 전체</button>
                 <button style={mainTab === "summary" ? activeTabStyle : tabStyle} onClick={() => setMainTab("summary")}>📅 날짜별 요약</button>
-                <button style={mainTab === "neg" ? activeTabStyle : tabStyle} onClick={() => setMainTab("neg")}>⚠️ 마이너스 ({negInvList.length})</button>
             </div>
 
             {/* 검색 및 필터 */}
-            {mainTab !== "summary" && (
+            {mainTab !== "summary" && mainTab !== "prod" && (
                 <div style={{ flexShrink: 0, display: "flex", gap: "0.5rem", marginBottom: "0.5rem", flexWrap: "wrap", background: "#fff", padding: "0.5rem", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                     <input
                         type="text"
@@ -208,14 +218,6 @@ export function DashView({
                                     <th style={{ ...thStyle, width: "15%" }}>총 수량</th>
                                 </>
                             )}
-                            {mainTab === "neg" && (
-                                <>
-                                    <th style={thStyle}>품번</th>
-                                    <th style={{ ...thStyle, width: "40%" }}>품명</th>
-                                    <th style={thStyle}>창고위치</th>
-                                    <th style={thStyle}>재고수량</th>
-                                </>
-                            )}
                             {mainTab === "summary" && (
                                 <>
                                     <th style={thStyle}>납기일자</th>
@@ -226,41 +228,29 @@ export function DashView({
                         </tr>
                     </thead>
                     <tbody>
-                        {/* 💡 수정됨: 출하 탭과 마이너스 탭만 여기서 렌더링 (prod는 아래 전용 로직에서 처리) */}
-                        {mainTab !== "summary" && mainTab !== "prod" && activeData.map((item, idx) => (
+                        {/* 출하 탭 렌더링 */}
+                        {mainTab.includes("ship") && activeData.map((item, idx) => (
                             <tr key={idx} style={tbodyTrStyle}>
-                                {mainTab.includes("ship") && (
-                                    <>
-                                        <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{item.납기일자}</td>
-                                        <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
-                                        <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
-                                            <div style={{ fontWeight: "600", wordBreak: "break-all" }}>{item.품목명}</div>
-                                            <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "2px", wordBreak: "break-all" }}>{item.품목번호}</div>
-                                        </td>
-                                        <td style={{ ...tdStyle, fontWeight: "600", whiteSpace: "nowrap" }}>{item.수량}</td>
-                                        <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item._currentInvQty ?? "-"}</td>
-                                        <td style={{ ...tdStyle, color: item._incomingProd > 0 ? "#2563eb" : "#94a3b8" }}>
-                                            <div style={{ whiteSpace: "nowrap" }}>{item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}</div>
-                                        </td>
-                                        <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
-                                            <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
-                                        </td>
-                                        <td style={{ ...tdStyle }}>{renderStatusBadge(item._status)}</td>
-                                        <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "0.65rem", wordBreak: "break-all" }}>{item.출하의뢰번호}</td>
-                                        <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
-                                        <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
-                                            {item._note ? <span style={{ color: "#d97706", fontWeight: "600", wordBreak: "keep-all" }}>{item._note}</span> : <span style={{ color: "#cbd5e1" }}>-</span>}
-                                        </td>
-                                    </>
-                                )}
-                                {mainTab === "neg" && (
-                                    <>
-                                        <td style={{ ...tdStyle, fontWeight: "600" }}>{item.품번}</td>
-                                        <td style={{ ...tdStyle, textAlign: "left" }}>{item.품명}</td>
-                                        <td style={tdStyle}>{item.창고 || "-"}</td>
-                                        <td style={{ ...tdStyle, fontWeight: "700", color: "#ef4444" }}>{item.재고수량}</td>
-                                    </>
-                                )}
+                                <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{item.납기일자}</td>
+                                <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
+                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
+                                    <div style={{ fontWeight: "600", wordBreak: "break-all" }}>{item.품목명}</div>
+                                    <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "2px", wordBreak: "break-all" }}>{item.품목번호}</div>
+                                </td>
+                                <td style={{ ...tdStyle, fontWeight: "600", whiteSpace: "nowrap" }}>{item.수량}</td>
+                                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item._currentInvQty ?? "-"}</td>
+                                <td style={{ ...tdStyle, color: item._incomingProd > 0 ? "#2563eb" : "#94a3b8" }}>
+                                    <div style={{ whiteSpace: "nowrap" }}>{item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}</div>
+                                </td>
+                                <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
+                                    <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
+                                </td>
+                                <td style={{ ...tdStyle }}>{renderStatusBadge(item._status)}</td>
+                                <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "0.65rem", wordBreak: "break-all" }}>{item.출하의뢰번호}</td>
+                                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
+                                <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
+                                    {item._note ? <span style={{ color: "#d97706", fontWeight: "600", wordBreak: "keep-all" }}>{item._note}</span> : <span style={{ color: "#cbd5e1" }}>-</span>}
+                                </td>
                             </tr>
                         ))}
 
@@ -347,28 +337,63 @@ export function DashView({
                                                     <thead>
                                                         <tr style={{ background: "#eef2f7" }}>
                                                             <th style={thStyle}>거래처명</th>
-                                                            <th style={{ ...thStyle, width: "25%" }}>품목명 / 규격</th>
+                                                            <th style={{ ...thStyle, width: "22%" }}>품목명 / 규격</th>
                                                             <th style={thStyle}>수량</th>
                                                             <th style={thStyle}>담당</th>
                                                             <th style={thStyle}>상태</th>
+                                                            <th style={{ ...thStyle, width: "22%", textAlign: "left", paddingLeft: "0.5rem" }}>메모</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {detailItems.map((d, di) => (
-                                                            <tr key={di} style={tbodyTrStyle}>
-                                                                <td style={{ ...tdStyle, fontWeight: "600" }}>{d.거래처명}</td>
-                                                                <td style={{ ...tdStyle, textAlign: "left" }}>
-                                                                    <div style={{ fontWeight: "600" }}>{d.품목명}</div>
-                                                                    <div style={{ fontSize: "0.6875rem", color: "#64748b", marginTop: "2px" }}>{d.규격}</div>
-                                                                </td>
-                                                                <td style={tdStyle}>{d.수량}</td>
-                                                                <td style={tdStyle}>{d.담당자}</td>
-                                                                <td style={tdStyle}>{renderStatusBadge(d._status)}</td>
-                                                            </tr>
-                                                        ))}
+                                                        {detailItems.map((d, di) => {
+                                                            const memoKey = d.출하의뢰번호 || `${d.거래처명}_${d.품목번호}_${d.납기일자}`;
+                                                            const isEditing = editingKey === memoKey;
+                                                            const memoVal = memos[memoKey] || "";
+                                                            return (
+                                                                <tr key={di} style={{ ...tbodyTrStyle, background: d._status === "shortage" ? "#fffbeb" : undefined }}>
+                                                                    <td style={{ ...tdStyle, fontWeight: "600" }}>{d.거래처명}</td>
+                                                                    <td style={{ ...tdStyle, textAlign: "left" }}>
+                                                                        <div style={{ fontWeight: "600" }}>{d.품목명}</div>
+                                                                        <div style={{ fontSize: "0.6875rem", color: "#64748b", marginTop: "2px" }}>{d.규격}</div>
+                                                                    </td>
+                                                                    <td style={tdStyle}>{d.수량}</td>
+                                                                    <td style={tdStyle}>{d.담당자}</td>
+                                                                    <td style={tdStyle}>{renderStatusBadge(d._status)}</td>
+                                                                    <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.4rem" }}>
+                                                                        {isEditing ? (
+                                                                            <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                                                                                <input
+                                                                                    autoFocus
+                                                                                    defaultValue={memoVal}
+                                                                                    onKeyDown={e => {
+                                                                                        if (e.key === "Enter") { saveMemo(memoKey, e.target.value); setEditingKey(null); }
+                                                                                        if (e.key === "Escape") setEditingKey(null);
+                                                                                    }}
+                                                                                    onBlur={e => { saveMemo(memoKey, e.target.value); setEditingKey(null); }}
+                                                                                    placeholder="예: 6/21 생산완료"
+                                                                                    style={{ flex: 1, fontSize: "0.75rem", padding: "3px 6px", border: "1px solid #93c5fd", borderRadius: "4px", outline: "none", minWidth: 0 }}
+                                                                                />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div
+                                                                                onClick={() => setEditingKey(memoKey)}
+                                                                                style={{ cursor: "pointer", minHeight: "22px", padding: "2px 6px", borderRadius: "4px", border: "1px dashed transparent", transition: "border 0.15s" }}
+                                                                                onMouseEnter={e => e.currentTarget.style.borderColor = "#93c5fd"}
+                                                                                onMouseLeave={e => e.currentTarget.style.borderColor = "transparent"}
+                                                                            >
+                                                                                {memoVal
+                                                                                    ? <span style={{ fontSize: "0.75rem", color: "#1d4ed8", fontWeight: "600" }}>{memoVal}</span>
+                                                                                    : <span style={{ fontSize: "0.7rem", color: "#cbd5e1" }}>클릭하여 입력</span>
+                                                                                }
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
                                                         {detailItems.length === 0 && (
                                                             <tr>
-                                                                <td colSpan="5" style={{ padding: "1rem", textAlign: "center", color: "#94a3b8" }}>해당 날짜 출하 데이터가 없습니다.</td>
+                                                                <td colSpan="6" style={{ padding: "1rem", textAlign: "center", color: "#94a3b8" }}>해당 날짜 출하 데이터가 없습니다.</td>
                                                             </tr>
                                                         )}
                                                     </tbody>
@@ -381,7 +406,7 @@ export function DashView({
                         })}
 
                         {/* 빈 데이터 상태 표시 */}
-                        {((mainTab !== "summary" && mainTab !== "prod" && activeData.length === 0) ||
+                        {((mainTab.includes("ship") && activeData.length === 0) ||
                             (mainTab === "summary" && dailySummaryData.length === 0) ||
                             (mainTab === "prod" && prodSummaryData.length === 0)) && (
                                 <tr>

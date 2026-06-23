@@ -351,8 +351,6 @@ export default function App() {
               sortedShipOvs={sortedShipOvs}
               sortedProd={sortedProd}
               prodSummaryData={prodSummaryData}
-              filteredNegInv={filteredNegInv}
-              negInvList={negInvList}
               dailySummaryData={dailySummaryData}
               allShipData={shipEnriched}
             />
