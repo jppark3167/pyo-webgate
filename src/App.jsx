@@ -262,12 +262,15 @@ export default function App() {
     Object.values(groups).forEach(group => {
       group.sort(byDueDate);
 
-      // 동일 품목 + 동일 납기일 건수 집계 (완료 건 제외)
-      const sameDateCount = {};
-      group.forEach(r => {
+      // 동일 품목 + 동일 납기일에 "서로 다른 출하의뢰"가 2건 이상이면 배분 우선순위를 판단할 수 없어 표시
+      // (납기일 없는 건 제외 / 같은 출하의뢰번호는 한 건으로 취급 / 완료 건 제외 / 날짜는 normDate로 정규화)
+      const ordersByDate = {};
+      group.forEach((r, i) => {
         if (str(r.상태) === "완료") return;
-        const d = str(r.납기일자);
-        sameDateCount[d] = (sameDateCount[d] || 0) + 1;
+        const due = normDate(r.납기일자);
+        if (!due) return;
+        const orderId = str(r.출하의뢰번호) || `__row${i}`;
+        (ordersByDate[due] ||= new Set()).add(orderId);
       });
 
       const baseInv = group[0]._currentInvQty;        // 현재고(즉시 가용)
@@ -302,14 +305,13 @@ export default function App() {
         r._kceLateDates = uniqDates(kceLate);
         r._projectedInvQty = projected;
 
-        // 동일 납기일에 같은 품목 출하의뢰가 2건 이상이면 배분 우선순위를 판단할 수 없어 별도 표시
-        const isDup = str(r.상태) !== "완료" && sameDateCount[str(r.납기일자)] >= 2;
-        if (isDup) {
-          r._status = "shortage";
+        // 상태는 항상 실제 예상재고 기준. "중복 출하 확인필요"는 재고부족이면서 중복인 건에만 표시
+        const isDup = str(r.상태) !== "완료" && due && (ordersByDate[due]?.size >= 2);
+        r._status = projected < 0 ? "shortage" : "ok";
+        if (isDup && projected < 0) {
           r._note = "중복 출하 확인필요";
           r._noteType = "dup";
         } else {
-          r._status = projected < 0 ? "shortage" : "ok";
           r._note = r._kceNote;
           r._noteType = r._kceNote ? "kce" : null;
         }
