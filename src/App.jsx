@@ -129,7 +129,7 @@ export default function App() {
         // 입고예정일: 메모 셀에서 첫 번째 날짜만 추출 (예: "136대 6/2\n64대-7/3" → "6/2")
         const memoCell = cols[3] || "";
         const dateMatch = memoCell.match(/(\d{1,2}\/\d{1,2})/);
-        const 입고예정일 = dateMatch ? `2026/${dateMatch[1].padStart(4, "0")}` : "";
+        const 입고예정일 = dateMatch ? `${new Date().getFullYear()}/${dateMatch[1].padStart(4, "0")}` : "";
 
         return {
           품번: cols[0],

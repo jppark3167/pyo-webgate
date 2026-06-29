@@ -11,9 +11,14 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 let db;
 
-// MongoDB 연결
+// MongoDB 연결 (자동 재연결 포함)
 async function connectDB() {
-    const client = new MongoClient(MONGODB_URI);
+    const client = new MongoClient(MONGODB_URI, {
+        serverSelectionTimeoutMS: 5000,
+        heartbeatFrequencyMS: 10000,
+    });
+    client.on("close", () => console.warn("⚠️ MongoDB 연결 끊김 — 자동 재연결 시도 중..."));
+    client.on("reconnected", () => console.log("✅ MongoDB 재연결 성공"));
     await client.connect();
     db = client.db("pyo-webgate");
     console.log("✅ MongoDB 연결 성공");
