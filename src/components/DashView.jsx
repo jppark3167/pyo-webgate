@@ -152,20 +152,18 @@ function IncomingCell({ qty, dates, lateQty, lateDates, color, dateColor, showLa
     if (!qty && !late) return <td style={tdStyle}><span style={{ color: "#94a3b8" }}>-</span></td>;
     return (
         <td style={tdStyle}>
-            <div style={{ whiteSpace: "nowrap" }}>
-                {qty > 0
-                    ? <>
-                        <span style={{ fontWeight: "700", color }}>+{qty}</span>
-                        {dates?.length > 0 && <div style={{ fontSize: "0.6rem", color: dateColor }}>{dates.map(d => fmtD(d)).join(", ")}</div>}
-                    </>
-                    : <span style={{ color: "#cbd5e1" }}>-</span>}
-                {late && (
-                    <div style={{ fontSize: "0.6rem", color: "#ea580c", marginTop: "2px", fontWeight: "600" }}>
-                        ⏰지연 +{lateQty}
-                        {lateDates?.length > 0 && <span style={{ fontWeight: "400" }}> ({lateDates.map(d => fmtD(d)).join(", ")})</span>}
-                    </div>
-                )}
-            </div>
+            {qty > 0
+                ? <>
+                    <div style={{ fontWeight: "700", color, whiteSpace: "nowrap" }}>+{qty}</div>
+                    {dates?.length > 0 && <div style={{ fontSize: "0.6rem", color: dateColor, lineHeight: 1.2 }}>{dates.map(d => fmtD(d)).join(", ")}</div>}
+                </>
+                : <span style={{ color: "#cbd5e1" }}>-</span>}
+            {late && (
+                <div style={{ fontSize: "0.6rem", color: "#ea580c", marginTop: "2px", fontWeight: "600", lineHeight: 1.3 }}>
+                    <div style={{ whiteSpace: "nowrap" }}>⏰지연 +{lateQty}</div>
+                    {lateDates?.length > 0 && <div style={{ fontWeight: "400" }}>{lateDates.map(d => fmtD(d)).join(", ")}</div>}
+                </div>
+            )}
         </td>
     );
 }
