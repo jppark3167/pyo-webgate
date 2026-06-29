@@ -1,37 +1,43 @@
-// server.js - 출하 일정관리 백엔드
+// server.js - 출하 일정관리 백엔드 (MongoDB 버전)
 const express = require("express");
 const cors = require("cors");
-const fs = require("fs");
 const path = require("path");
+const { MongoClient } = require("mongodb");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DATA_DIR = path.join(__dirname, "data");
-const DB_FILE = path.join(DATA_DIR, "db.json");
+const MONGODB_URI = process.env.MONGODB_URI;
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+let db;
+
+// MongoDB 연결
+async function connectDB() {
+    const client = new MongoClient(MONGODB_URI);
+    await client.connect();
+    db = client.db("pyo-webgate");
+    console.log("✅ MongoDB 연결 성공");
+}
 
 const DEFAULT_DB = {
     prodData: [], invData: [], shipData: [], kceData: [],
     memos: {}, prodFile: "", invFile: "", updatedAt: null
 };
 
-function readDB() {
-    try {
-        if (!fs.existsSync(DB_FILE)) return { ...DEFAULT_DB };
-        return { ...DEFAULT_DB, ...JSON.parse(fs.readFileSync(DB_FILE, "utf-8")) };
-    } catch { return { ...DEFAULT_DB }; }
+async function readDB() {
+    const doc = await db.collection("appdata").findOne({ _id: "main" });
+    return doc ? { ...DEFAULT_DB, ...doc } : { ...DEFAULT_DB };
 }
 
-function writeDB(data) {
+async function writeDB(data) {
     data.updatedAt = new Date().toISOString();
-    // 안전한 저장: temp 파일에 먼저 쓰고 교체
-    const tmp = DB_FILE + ".tmp";
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
-    fs.renameSync(tmp, DB_FILE);
+    await db.collection("appdata").updateOne(
+        { _id: "main" },
+        { $set: data },
+        { upsert: true }
+    );
 }
 
-// CORS 설정 - 허용할 도메인만 명시
+// CORS 설정
 const allowedOrigins = [
     "http://localhost:5173",
     "http://localhost:3001",
@@ -40,7 +46,6 @@ const allowedOrigins = [
 ];
 app.use(cors({
     origin: (origin, callback) => {
-        // origin이 없으면 같은 서버에서 온 요청 (허용)
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
@@ -53,60 +58,68 @@ app.use(express.json({ limit: "50mb" }));
 
 // React 빌드 정적 파일
 const BUILD_DIR = path.join(__dirname, "../dist");
+const fs = require("fs");
 if (fs.existsSync(BUILD_DIR)) app.use(express.static(BUILD_DIR));
 
 // ── API ───────────────────────────────────────
 
-// 전체 데이터 조회
-app.get("/api/data", (req, res) => res.json(readDB()));
-
-// 출하의뢰 저장
-app.post("/api/ship", (req, res) => {
-    const { shipData } = req.body;
-    if (!Array.isArray(shipData)) return res.status(400).json({ error: "배열 필요" });
-    const db = readDB(); db.shipData = shipData; writeDB(db);
-    res.json({ ok: true, count: shipData.length });
+app.get("/api/data", async (req, res) => {
+    try { res.json(await readDB()); }
+    catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 재고현황 저장
-app.post("/api/inv", (req, res) => {
-    const { invData, fileName } = req.body;
-    if (!Array.isArray(invData)) return res.status(400).json({ error: "배열 필요" });
-    const db = readDB(); db.invData = invData; db.invFile = fileName || ""; writeDB(db);
-    res.json({ ok: true, count: invData.length });
+app.post("/api/ship", async (req, res) => {
+    try {
+        const { shipData } = req.body;
+        if (!Array.isArray(shipData)) return res.status(400).json({ error: "배열 필요" });
+        const db2 = await readDB(); db2.shipData = shipData; await writeDB(db2);
+        res.json({ ok: true, count: shipData.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 생산계획 저장
-app.post("/api/prod", (req, res) => {
-    const { prodData, fileName } = req.body;
-    if (!Array.isArray(prodData)) return res.status(400).json({ error: "배열 필요" });
-    const db = readDB(); db.prodData = prodData; db.prodFile = fileName || ""; writeDB(db);
-    res.json({ ok: true, count: prodData.length });
+app.post("/api/inv", async (req, res) => {
+    try {
+        const { invData, fileName } = req.body;
+        if (!Array.isArray(invData)) return res.status(400).json({ error: "배열 필요" });
+        const db2 = await readDB(); db2.invData = invData; db2.invFile = fileName || ""; await writeDB(db2);
+        res.json({ ok: true, count: invData.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// KCE 입고일정 저장
-app.post("/api/kce", (req, res) => {
-    const { kceData } = req.body;
-    if (!Array.isArray(kceData)) return res.status(400).json({ error: "배열 필요" });
-    const db = readDB(); db.kceData = kceData; writeDB(db);
-    res.json({ ok: true, count: kceData.length });
+app.post("/api/prod", async (req, res) => {
+    try {
+        const { prodData, fileName } = req.body;
+        if (!Array.isArray(prodData)) return res.status(400).json({ error: "배열 필요" });
+        const db2 = await readDB(); db2.prodData = prodData; db2.prodFile = fileName || ""; await writeDB(db2);
+        res.json({ ok: true, count: prodData.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 메모 단건 저장/삭제
-app.patch("/api/memos", (req, res) => {
-    const { key, value } = req.body;
-    if (!key) return res.status(400).json({ error: "key 필요" });
-    const db = readDB();
-    if (!db.memos) db.memos = {};
-    if (value === "" || value == null) delete db.memos[key];
-    else db.memos[key] = value;
-    writeDB(db);
-    res.json({ ok: true });
+app.post("/api/kce", async (req, res) => {
+    try {
+        const { kceData } = req.body;
+        if (!Array.isArray(kceData)) return res.status(400).json({ error: "배열 필요" });
+        const db2 = await readDB(); db2.kceData = kceData; await writeDB(db2);
+        res.json({ ok: true, count: kceData.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// 전체 초기화
-app.delete("/api/data", (req, res) => {
-    writeDB({ ...DEFAULT_DB }); res.json({ ok: true });
+app.patch("/api/memos", async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        if (!key) return res.status(400).json({ error: "key 필요" });
+        const db2 = await readDB();
+        if (!db2.memos) db2.memos = {};
+        if (value === "" || value == null) delete db2.memos[key];
+        else db2.memos[key] = value;
+        await writeDB(db2);
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/data", async (req, res) => {
+    try { await writeDB({ ...DEFAULT_DB }); res.json({ ok: true }); }
+    catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // SPA fallback
@@ -114,7 +127,12 @@ if (fs.existsSync(BUILD_DIR)) {
     app.get("*", (req, res) => res.sendFile(path.join(BUILD_DIR, "index.html")));
 }
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
-    console.log(`📁 데이터 저장: ${DB_FILE}`);
+// 서버 시작
+connectDB().then(() => {
+    app.listen(PORT, "0.0.0.0", () => {
+        console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
+    });
+}).catch(err => {
+    console.error("❌ MongoDB 연결 실패:", err);
+    process.exit(1);
 });
