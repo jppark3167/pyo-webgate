@@ -110,7 +110,6 @@ export function DashView({
     const [selectedProdDate, setSelectedProdDate] = useState(null);
     const [editingKey, setEditingKey] = useState(null);
 
-    // 메모: 서버에서 받은 initialMemos 우선, 없으면 localStorage
     const [memos, setMemos] = useState(() => {
         if (initialMemos) return initialMemos;
         try { return JSON.parse(localStorage.getItem("wg_memos") || "{}"); } catch { return {}; }
@@ -168,15 +167,16 @@ export function DashView({
                             {mainTab.includes("ship") && (<>
                                 <th style={{ ...thStyle, width: "6%" }}>납기일자</th>
                                 <th style={{ ...thStyle, width: "12%" }}>의뢰처명</th>
-                                <th style={{ ...thStyle, width: "20%", textAlign: "left", paddingLeft: "0.5rem" }}>품목명</th>
+                                <th style={{ ...thStyle, width: "18%", textAlign: "left", paddingLeft: "0.5rem" }}>품목명</th>
                                 <th style={{ ...thStyle, width: "5%" }}>수량</th>
-                                <th style={{ ...thStyle, width: "6%" }}>현재고</th>
-                                <th style={{ ...thStyle, width: "8%" }}>생산예정</th>
-                                <th style={{ ...thStyle, width: "9%" }}>예상재고</th>
+                                <th style={{ ...thStyle, width: "5%" }}>현재고</th>
+                                <th style={{ ...thStyle, width: "7%" }}>생산예정</th>
+                                <th style={{ ...thStyle, width: "7%", color: "#1e40af" }}>KCE 입고</th>
+                                <th style={{ ...thStyle, width: "8%" }}>예상재고</th>
                                 <th style={{ ...thStyle, width: "7%" }}>상태</th>
                                 <th style={{ ...thStyle, width: "10%" }}>의뢰번호</th>
                                 <th style={{ ...thStyle, width: "5%" }}>담당</th>
-                                <th style={{ ...thStyle, width: "12%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
+                                <th style={{ ...thStyle, width: "10%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
                             </>)}
                             {mainTab === "prod" && (<>
                                 <th style={{ ...thStyle, width: "15%" }}>계획일자</th>
@@ -204,7 +204,29 @@ export function DashView({
                                 <td style={{ ...tdStyle, fontWeight: "600", whiteSpace: "nowrap" }}>{item.수량}</td>
                                 <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item._currentInvQty ?? "-"}</td>
                                 <td style={{ ...tdStyle, color: item._incomingProd > 0 ? "#2563eb" : "#94a3b8" }}>
-                                    <div style={{ whiteSpace: "nowrap" }}>{item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}</div>
+                                    <div style={{ whiteSpace: "nowrap" }}>
+                                        {item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
+                                        {item._incomingProd > 0 && item._prodDates?.length > 0 && (
+                                            <div style={{ fontSize: "0.6rem", color: "#60a5fa", marginTop: "1px" }}>
+                                                {item._prodDates.map(d => fmtD(d)).join(", ")}
+                                            </div>
+                                        )}
+                                    </div>
+                                </td>
+                                {/* KCE 입고 컬럼 */}
+                                <td style={{ ...tdStyle, color: item._kceIncoming > 0 ? "#1e40af" : "#94a3b8" }}>
+                                    <div style={{ whiteSpace: "nowrap" }}>
+                                        {item._kceIncoming > 0 ? (
+                                            <>
+                                                <span style={{ fontWeight: "700", color: "#1e40af" }}>+{item._kceIncoming}</span>
+                                                {item._kceDates?.length > 0 && (
+                                                    <div style={{ fontSize: "0.6rem", color: "#3b82f6", marginTop: "1px" }}>
+                                                        {item._kceDates.map(d => fmtD(d)).join(", ")}
+                                                    </div>
+                                                )}
+                                            </>
+                                        ) : "-"}
+                                    </div>
                                 </td>
                                 <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
                                     <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
@@ -303,7 +325,6 @@ export function DashView({
                                                             const memoKey = d.출하의뢰번호 || `${d.거래처명}_${d.품목번호}_${d.납기일자}`;
                                                             const isEditing = editingKey === memoKey;
                                                             const memoVal = memos[memoKey] || "";
-                                                            // KCE 품번이고 메모가 있으면 → KCE 입고예정 배지
                                                             const displayStatus = (d._note && memoVal) ? "kce_scheduled" : d._status;
                                                             const rowBg = (d._note && memoVal) ? "#f5f3ff" : d._status === "shortage" ? "#fffbeb" : undefined;
                                                             return (
