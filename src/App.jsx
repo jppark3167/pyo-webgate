@@ -1,9 +1,18 @@
 // App.jsx: 메인 애플리케이션 컴포넌트 (서버 연동 + KCE 입고일정 버전)
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { globalCss, str, findInv } from "./utils";
+import { globalCss, str, num, findInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
 import { InputView, DashView } from "./components/index";
 import { processProdFile, processInvFile } from "./excelParser";
 import { api } from "./api";
+
+// 납기일 오름차순 비교 (납기일 없는 건은 뒤로)
+const byDueDate = (a, b) => {
+  const da = str(a.납기일자), db = str(b.납기일자);
+  if (!da && !db) return 0;
+  if (!da) return 1;
+  if (!db) return -1;
+  return da.localeCompare(db);
+};
 
 export default function App() {
   const [prodData, setProdData] = useState([]);
@@ -116,37 +125,27 @@ export default function App() {
   };
 
   // ── KCE 입고일정 텍스트 파싱 ─────────────────
+  // 컬럼 순서: 품번 / 수량 / 발주일 / 입고예정일(메모) / 미입고수 / 담당자
   const handleKceParse = async () => {
     if (!kceText.trim()) { setParseMsg("⚠️ KCE 입고일정 텍스트를 입력하세요"); return; }
     try {
-      const rows = kceText.trim().split("\n");
       const today = new Date(); today.setHours(0, 0, 0, 0);
+      const rows = parseTSV(kceText.trim());
 
-      const parsed = rows.map(row => {
-        const cols = row.split("\t").map(c => c.trim());
-        // 컬럼 순서: 품번 / 발주수량 / 발주일 / 입고예정일(메모) / 발주요청 / 담당자
-
-        // 입고예정일: 메모 셀에서 첫 번째 날짜만 추출 (예: "136대 6/2\n64대-7/3" → "6/2")
-        const memoCell = cols[3] || "";
-        const dateMatch = memoCell.match(/(\d{1,2}\/\d{1,2})/);
-        const 입고예정일 = dateMatch ? `${new Date().getFullYear()}/${dateMatch[1].padStart(4, "0")}` : "";
-
+      const parsed = rows.map(cols => {
+        const c = cols.map(x => str(x));
+        const 입고예정일 = c[3] || "";
+        const 미입고수 = num(c[4]);
         return {
-          품번: cols[0],
-          발주수량: parseFloat(cols[1]?.replace(/,/g, "")) || 0,
-          발주일: cols[2],
-          입고예정일: 입고예정일,
-          발주요청: parseFloat(cols[4]?.replace(/,/g, "")) || 0,
-          담당자: cols[5] || "",
+          품번: c[0],
+          발주수량: num(c[1]),
+          발주일: c[2] || "",
+          입고예정일,                                   // 원본 메모 (표시/디버그용)
+          미입고수,                                     // 아직 입고되지 않은 수량 (= 공급 반영 대상)
+          담당자: c[5] || "",
+          _schedule: parseKceSchedule(입고예정일, 미입고수, today),  // [{date, qty}] 절대일자
         };
-      }).filter(item => {
-        if (!item.품번) return false;
-        if (item.입고예정일) {
-          const d = new Date(item.입고예정일.replace(/\//g, "-"));
-          if (!isNaN(d) && d < today) return false;
-        }
-        return item.발주요청 > 0;
-      });
+      }).filter(item => item.품번 && item.미입고수 > 0);
 
       setKceData(parsed);
       await api.saveKce(parsed);
@@ -158,78 +157,144 @@ export default function App() {
     }
   };
 
-  // ── 생산계획 수량 맵 (품번 기준) ──────────────
+  // ── 생산계획 입고 일정 맵 (품번 → [{date, qty}]) ──────────────
+  // 생산계획일자를 입고 가능 시점으로 사용
   const prodQtyMap = useMemo(() => {
     const map = {};
     prodData.forEach(item => {
       const code = str(item.제품코드).toUpperCase();
       if (!code) return;
-      if (!map[code]) map[code] = { qty: 0, dates: [] };
-      map[code].qty += (item.수량 || 0);
-      if (item.생산계획일자 && !map[code].dates.includes(item.생산계획일자))
-        map[code].dates.push(item.생산계획일자);
+      (map[code] ||= []).push({ date: normDate(item.생산계획일자), qty: item.수량 || 0 });
     });
     return map;
   }, [prodData]);
 
-  // ── KCE 입고예정 수량 맵 (품번 기준) ──────────
+  // ── KCE 입고예정 맵 (품번 → {arrivals: [{date, qty}], undated}) ──────────
+  // arrivals = 오늘 이후(미입고) 일자 확정분, undated = 일자 미확정 미입고분(항상 가용으로 간주)
   const kceQtyMap = useMemo(() => {
+    const todayStr = toDateStr(new Date());
     const map = {};
     kceData.forEach(item => {
       const code = str(item.품번).toUpperCase();
       if (!code) return;
-      if (!map[code]) map[code] = { qty: 0, dates: [] };
-      map[code].qty += (item.발주요청 || 0);
-      if (item.입고예정일 && !map[code].dates.includes(item.입고예정일))
-        map[code].dates.push(item.입고예정일);
+      if (!map[code]) map[code] = { arrivals: [], unreceived: 0 };
+      map[code].unreceived += (item.미입고수 ?? item.발주요청 ?? 0);
+      const sched = item._schedule
+        || (item.입고예정일 ? [{ date: normDate(item.입고예정일), qty: (item.미입고수 ?? item.발주요청 ?? 0) }] : []);
+      sched.forEach(s => map[code].arrivals.push({ date: normDate(s.date), qty: s.qty || 0 }));
+    });
+    Object.values(map).forEach(e => {
+      const future = e.arrivals.filter(a => a.date && a.date >= todayStr);
+      const futureSum = future.reduce((s, a) => s + a.qty, 0);
+      e.arrivals = future;
+      e.undated = Math.max(0, e.unreceived - futureSum);
     });
     return map;
   }, [kceData]);
 
-  // ── 출하의뢰 enriched (재고 판정 포함) ─────────
+  // ── 출하의뢰 enriched (납기일 기준 시점별 재고 배분) ─────────
+  // 핵심: 납기일보다 늦게 들어오는 생산/KCE는 그 건의 가용재고로 잡지 않는다(결함 2).
   const shipEnriched = useMemo(() => {
-    return [...shipData]
-      .map(r => {
-        const isCarriage = str(r.품목명).includes("운반비") || str(r.품목명).includes("기타");
-        if (isCarriage) return {
-          ...r, _currentInvQty: null, _incomingProd: 0, _prodDates: [],
-          _kceIncoming: 0, _kceDates: [], _projectedInvQty: null,
-          _projectedDisplay: "-", _status: "skip", _note: null,
-        };
+    const sumQty = arr => arr.reduce((s, a) => s + (a.qty || 0), 0);
+    const uniqDates = arr => [...new Set(arr.map(a => a.date).filter(Boolean))].sort();
 
-        const inv = findInv(invData, r.품목번호);
-        const currentInv = inv ? inv.재고수량 : 0;
-        const codeUpper = str(r.품목번호).toUpperCase();
-        const prodInfo = prodQtyMap[codeUpper];
-        const incomingProd = prodInfo ? prodInfo.qty : 0;
-        const prodDates = prodInfo ? [...prodInfo.dates].sort() : [];
-        const kceInfo = kceQtyMap[codeUpper];
-        const kceIncoming = kceInfo ? kceInfo.qty : 0;
-        const kceDates = kceInfo ? [...kceInfo.dates].sort() : [];
-        const projected = currentInv + incomingProd + kceIncoming;
+    // 1단계: 운반비/기타 제외 + 품목별 정적 정보(현재고·입고일정) 계산
+    const rows = shipData.map(r => {
+      const isSkip = str(r.품목명).includes("운반비") || str(r.품목명).includes("기타");
+      if (isSkip) return { ...r, _skip: true };
 
-        const effectiveDemand = str(r.상태) === "완료" ? 0 : r.수량;
-        const computedStatus = (projected - effectiveDemand) < 0 ? "shortage" : "ok";
+      const inv = findInv(invData, r.품목번호);
+      const currentInv = inv ? inv.재고수량 : 0;
+      const codeUpper = str(r.품목번호).toUpperCase();
+      const prodArrivals = prodQtyMap[codeUpper] || [];
+      const kceInfo = kceQtyMap[codeUpper] || { arrivals: [], undated: 0 };
+      const kceTotal = sumQty(kceInfo.arrivals) + kceInfo.undated;
 
-        // KCE 품번인데 재고도 없고 KCE 입고일정도 없을 때만 비고 표시
-        const isKCE = /^(NK|KT|K)/.test(codeUpper);
-        const note = (isKCE && currentInv <= 0 && kceIncoming === 0) ? "KCE입고일정 확인 필요" : null;
+      // KCE 품번인데 재고도 없고 KCE 입고예정도 전혀 없을 때만 비고 표시
+      const isKCE = /^(NK|KT|K)/.test(codeUpper);
+      const kceNote = (isKCE && currentInv <= 0 && kceTotal === 0) ? "KCE입고일정 확인 필요" : null;
 
-        return {
-          ...r,
-          _currentInvQty: currentInv,
-          _incomingProd: incomingProd,
-          _prodDates: prodDates,
-          _kceIncoming: kceIncoming,
-          _kceDates: kceDates,
-          _projectedInvQty: projected,
-          _projectedDisplay: `${currentInv} + ${incomingProd}${kceIncoming > 0 ? ` + KCE${kceIncoming}` : ""}`,
-          _status: computedStatus,
-          _note: note,
-        };
-      })
+      return {
+        ...r, _skip: false, _codeUpper: codeUpper, _currentInvQty: currentInv,
+        _prodArrivals: prodArrivals, _kceArrivals: kceInfo.arrivals, _kceUndated: kceInfo.undated,
+        _kceNote: kceNote,
+      };
+    });
+
+    // 2단계: 품목번호 기준 그룹화 (운반비/기타 제외)
+    const groups = {};
+    rows.forEach(r => {
+      if (r._skip) return;
+      (groups[r._codeUpper] ||= []).push(r);
+    });
+
+    // 3단계: 그룹별로 납기일 빠른 순 처리 — 각 건 시점에 "그 날까지 들어오는 공급 − 누적 수요"로 판정
+    Object.values(groups).forEach(group => {
+      group.sort(byDueDate);
+
+      // 동일 품목 + 동일 납기일 건수 집계 (완료 건 제외)
+      const sameDateCount = {};
+      group.forEach(r => {
+        if (str(r.상태) === "완료") return;
+        const d = str(r.납기일자);
+        sameDateCount[d] = (sameDateCount[d] || 0) + 1;
+      });
+
+      const baseInv = group[0]._currentInvQty;        // 현재고(즉시 가용)
+      const prodArr = group[0]._prodArrivals;          // 동일 품목이므로 입고일정 공유
+      const kceArr = group[0]._kceArrivals;
+      const kceUndated = group[0]._kceUndated;         // 일자 미확정분 — 항상 가용으로 간주
+      let cumDemand = 0;
+
+      group.forEach(r => {
+        const due = normDate(r.납기일자);
+        const inTime = a => !due || a.date <= due;     // 납기일까지 들어오면 가용
+        const late = a => due && a.date > due;          // 납기일보다 늦게 들어옴
+
+        const prodInTime = prodArr.filter(inTime);
+        const prodLate = prodArr.filter(late);
+        const kceInTime = kceArr.filter(inTime);
+        const kceLate = kceArr.filter(late);
+
+        const prodInTimeSum = sumQty(prodInTime);
+        const kceInTimeSum = sumQty(kceInTime) + kceUndated;
+
+        cumDemand += str(r.상태) === "완료" ? 0 : (r.수량 || 0);
+        const projected = baseInv + prodInTimeSum + kceInTimeSum - cumDemand;
+
+        r._incomingProd = prodInTimeSum;
+        r._incomingProdLate = sumQty(prodLate);
+        r._prodDates = uniqDates(prodInTime);
+        r._prodLateDates = uniqDates(prodLate);
+        r._kceIncoming = kceInTimeSum;
+        r._kceIncomingLate = sumQty(kceLate);
+        r._kceDates = uniqDates(kceInTime);
+        r._kceLateDates = uniqDates(kceLate);
+        r._projectedInvQty = projected;
+
+        // 동일 납기일에 같은 품목 출하의뢰가 2건 이상이면 배분 우선순위를 판단할 수 없어 별도 표시
+        const isDup = str(r.상태) !== "완료" && sameDateCount[str(r.납기일자)] >= 2;
+        if (isDup) {
+          r._status = "shortage";
+          r._note = "중복 출하 확인필요";
+          r._noteType = "dup";
+        } else {
+          r._status = projected < 0 ? "shortage" : "ok";
+          r._note = r._kceNote;
+          r._noteType = r._kceNote ? "kce" : null;
+        }
+      });
+    });
+
+    // 4단계: 운반비/기타(skip) 행 마무리 후 평탄화
+    return rows
+      .map(r => r._skip ? {
+        ...r, _currentInvQty: null, _incomingProd: 0, _incomingProdLate: 0, _prodDates: [], _prodLateDates: [],
+        _kceIncoming: 0, _kceIncomingLate: 0, _kceDates: [], _kceLateDates: [], _projectedInvQty: null,
+        _status: "skip", _note: null, _noteType: null,
+      } : r)
       .filter(item => item._status !== "skip")
-      .sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
+      .sort(byDueDate);
   }, [shipData, invData, prodQtyMap, kceQtyMap]);
 
   // ── 국내/해외 분리 ─────────────────────────────

@@ -23,6 +23,14 @@ export const num = v => {
     return isNaN(n) ? 0 : n;
 };
 
+// Date → "YYYY-MM-DD" (로컬 시간 기준; toISOString은 UTC라 KST에서 하루 밀릴 수 있어 사용하지 않음)
+export function toDateStr(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
 export function fmtXlDate(v) {
     if (!v && v !== 0) return "";
     if (typeof v === "string") return v.slice(0, 10).replace(/\./g, "-");
@@ -30,8 +38,71 @@ export function fmtXlDate(v) {
         const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
         return d.toISOString().slice(0, 10);
     }
-    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    if (v instanceof Date) return toDateStr(v);
     return String(v).slice(0, 10);
+}
+
+// 다양한 날짜 표기를 "YYYY-MM-DD"로 정규화 (- / . 구분자, YYYYMMDD 지원)
+export function normDate(s) {
+    if (!s && s !== 0) return "";
+    if (s instanceof Date) return toDateStr(s);
+    const t = String(s).trim();
+    let m = t.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+    m = t.match(/^(\d{4})(\d{2})(\d{2})/);
+    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+    return t.slice(0, 10);
+}
+
+// "M/D" + 연도 추론 → "YYYY-MM-DD" (오늘 기준 6개월 이상 과거면 내년으로 간주 → 연말/연초 경계 처리)
+export function resolveMD(month, day, today = new Date()) {
+    const y = today.getFullYear();
+    let d = new Date(y, month - 1, day);
+    const sixAgo = new Date(today);
+    sixAgo.setMonth(sixAgo.getMonth() - 6);
+    if (d < sixAgo) d = new Date(y + 1, month - 1, day);
+    return toDateStr(d);
+}
+
+// 엑셀에서 복사한 TSV 파싱 (따옴표로 묶인 셀 안의 줄바꿈/탭 보존)
+export function parseTSV(text) {
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+            if (c === '"') {
+                if (text[i + 1] === '"') { field += '"'; i++; }
+                else inQuotes = false;
+            } else field += c;
+        } else if (c === '"') {
+            inQuotes = true;
+        } else if (c === '\t') {
+            row.push(field); field = "";
+        } else if (c === '\n' || c === '\r') {
+            if (c === '\r' && text[i + 1] === '\n') i++;
+            row.push(field); rows.push(row); row = []; field = "";
+        } else field += c;
+    }
+    if (field !== "" || row.length > 0) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.some(cell => str(cell) !== ""));
+}
+
+// KCE 입고예정일 메모를 입고 일정 [{date, qty}]로 파싱
+// 예: "136대 6/2\n64대-7/3" → [{6/2,136},{7/3,64}],  단일 "7/3" → [{7/3, 미입고수}]
+export function parseKceSchedule(memo, unreceived, today = new Date()) {
+    if (!memo) return [];
+    const out = [];
+    const re = /(\d+)\s*대\s*-?\s*(\d{1,2})\/(\d{1,2})/g;
+    let m;
+    while ((m = re.exec(memo)) !== null) {
+        out.push({ qty: parseInt(m[1], 10), date: resolveMD(+m[2], +m[3], today) });
+    }
+    if (out.length === 0) {
+        const single = memo.match(/(\d{1,2})\/(\d{1,2})/);
+        if (single) out.push({ qty: unreceived, date: resolveMD(+single[1], +single[2], today) });
+    }
+    return out;
 }
 
 // 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭

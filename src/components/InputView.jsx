@@ -32,7 +32,8 @@ export function InputView({
 
             <Card title="📥 KCE 입고일정 붙여넣기" last>
                 <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 0, marginBottom: "0.75rem" }}>
-                    품번 / 발주수량 / 발주일 / 입고예정일 / 발주요청 순서로 붙여넣으세요.
+                    품번 / 수량 / 발주일 / 입고예정일 / 미입고수 / 담당자 순서로 붙여넣으세요.<br />
+                    입고예정일은 "136대 6/2 / 64대 7/3"처럼 여러 날짜를 적어도 자동 분리되며, 납기일보다 늦게 들어오는 물량은 가용재고로 잡지 않습니다.
                 </p>
                 <TextArea value={kceText} onChange={setKceText} placeholder="KCE 입고일정 데이터를 붙여넣으세요..." />
                 <SubmitButton onClick={handleKceParse} label="KCE 입고일정 적용" color="#0f766e" />

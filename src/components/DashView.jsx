@@ -145,6 +145,29 @@ export function DashView({
     );
 }
 
+// 생산예정/KCE 입고 셀 — 납기일까지 들어오는 양(정상)과 늦게 들어오는 양(지연)을 구분 표시
+function IncomingCell({ qty, dates, lateQty, lateDates, color, dateColor }) {
+    if (!qty && !lateQty) return <td style={tdStyle}><span style={{ color: "#94a3b8" }}>-</span></td>;
+    return (
+        <td style={tdStyle}>
+            <div style={{ whiteSpace: "nowrap" }}>
+                {qty > 0
+                    ? <>
+                        <span style={{ fontWeight: "700", color }}>+{qty}</span>
+                        {dates?.length > 0 && <div style={{ fontSize: "0.6rem", color: dateColor }}>{dates.map(d => fmtD(d)).join(", ")}</div>}
+                    </>
+                    : <span style={{ color: "#cbd5e1" }}>-</span>}
+                {lateQty > 0 && (
+                    <div style={{ fontSize: "0.6rem", color: "#ea580c", marginTop: "2px", fontWeight: "600" }}>
+                        ⏰지연 +{lateQty}
+                        {lateDates?.length > 0 && <span style={{ fontWeight: "400" }}> ({lateDates.map(d => fmtD(d)).join(", ")})</span>}
+                    </div>
+                )}
+            </div>
+        </td>
+    );
+}
+
 function EmptyMessage() {
     return <div style={{ textAlign: "center", padding: "3rem", color: "#94a3b8" }}>데이터가 없습니다.</div>;
 }
@@ -160,30 +183,8 @@ function ShipRow({ item }) {
             </td>
             <td style={{ ...tdStyle, fontWeight: "600", whiteSpace: "nowrap" }}>{item.수량}</td>
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item._currentInvQty ?? "-"}</td>
-            <td style={{ ...tdStyle, color: item._incomingProd > 0 ? "#2563eb" : "#94a3b8" }}>
-                <div style={{ whiteSpace: "nowrap" }}>
-                    {item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
-                    {item._incomingProd > 0 && item._prodDates?.length > 0 && (
-                        <div style={{ fontSize: "0.6rem", color: "#60a5fa", marginTop: "1px" }}>
-                            {item._prodDates.map(d => fmtD(d)).join(", ")}
-                        </div>
-                    )}
-                </div>
-            </td>
-            <td style={{ ...tdStyle, color: item._kceIncoming > 0 ? "#1e40af" : "#94a3b8" }}>
-                <div style={{ whiteSpace: "nowrap" }}>
-                    {item._kceIncoming > 0 ? (
-                        <>
-                            <span style={{ fontWeight: "700", color: "#1e40af" }}>+{item._kceIncoming}</span>
-                            {item._kceDates?.length > 0 && (
-                                <div style={{ fontSize: "0.6rem", color: "#3b82f6", marginTop: "1px" }}>
-                                    {item._kceDates.map(d => fmtD(d)).join(", ")}
-                                </div>
-                            )}
-                        </>
-                    ) : "-"}
-                </div>
-            </td>
+            <IncomingCell qty={item._incomingProd} dates={item._prodDates} lateQty={item._incomingProdLate} lateDates={item._prodLateDates} color="#2563eb" dateColor="#60a5fa" />
+            <IncomingCell qty={item._kceIncoming} dates={item._kceDates} lateQty={item._kceIncomingLate} lateDates={item._kceLateDates} color="#1e40af" dateColor="#3b82f6" />
             <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
                 <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
             </td>
@@ -192,7 +193,7 @@ function ShipRow({ item }) {
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
                 {item._note
-                    ? <span style={{ color: "#d97706", fontWeight: "600", wordBreak: "keep-all" }}>{item._note}</span>
+                    ? <span style={{ color: item._noteType === "dup" ? "#dc2626" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>
                     : <span style={{ color: "#cbd5e1" }}>-</span>}
             </td>
         </tr>
@@ -280,8 +281,8 @@ function SummaryAccordion({ item, allShipData, selectedDate, setSelectedDate, ed
                                     const memoKey = d.출하의뢰번호 || `${d.거래처명}_${d.품목번호}_${d.납기일자}`;
                                     const isEditing = editingKey === memoKey;
                                     const memoVal = memos[memoKey] || "";
-                                    const displayStatus = (d._note && memoVal) ? "kce_scheduled" : d._status;
-                                    const rowBg = (d._note && memoVal) ? "#f5f3ff" : d._status === "shortage" ? "#fffbeb" : undefined;
+                                    const displayStatus = (d._noteType === "kce" && memoVal) ? "kce_scheduled" : d._status;
+                                    const rowBg = (d._noteType === "kce" && memoVal) ? "#f5f3ff" : d._status === "shortage" ? "#fffbeb" : undefined;
                                     return (
                                         <tr key={di} style={{ ...tbodyTrStyle, background: rowBg }}>
                                             <td style={{ ...tdStyle, fontWeight: "600" }}>{d.거래처명}</td>

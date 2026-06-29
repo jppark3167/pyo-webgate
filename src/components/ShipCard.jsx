@@ -37,10 +37,12 @@ export function ShipCard({ item }) {
                 <GridCell label="현재고" value={item._currentInvQty ?? "-"} />
                 <GridCell label="생산예정" value={item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
                     labelColor="#2563eb" valueColor={item._incomingProd > 0 ? "#2563eb" : "#94a3b8"}
-                    sub={item._incomingProd > 0 && item._prodDates?.length > 0 ? item._prodDates.map(d => fmtD(d)).join(", ") : null} />
+                    sub={item._incomingProd > 0 && item._prodDates?.length > 0 ? item._prodDates.map(d => fmtD(d)).join(", ") : null}
+                    late={item._incomingProdLate > 0 ? `⏰+${item._incomingProdLate}` : null} />
                 <GridCell label="KCE입고" value={item._kceIncoming > 0 ? `+${item._kceIncoming}` : "-"}
                     labelColor="#1e40af" valueColor={item._kceIncoming > 0 ? "#1e40af" : "#94a3b8"}
-                    sub={item._kceIncoming > 0 && item._kceDates?.length > 0 ? item._kceDates.map(d => fmtD(d)).join(", ") : null} />
+                    sub={item._kceIncoming > 0 && item._kceDates?.length > 0 ? item._kceDates.map(d => fmtD(d)).join(", ") : null}
+                    late={item._kceIncomingLate > 0 ? `⏰+${item._kceIncomingLate}` : null} />
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
@@ -50,18 +52,19 @@ export function ShipCard({ item }) {
                         {item._projectedInvQty ?? "-"}
                     </span>
                 </div>
-                {item._note && <span style={{ fontSize: "0.7rem", color: "#d97706", fontWeight: "600" }}>{item._note}</span>}
+                {item._note && <span style={{ fontSize: "0.7rem", color: item._noteType === "dup" ? "#dc2626" : "#d97706", fontWeight: "700" }}>{item._note}</span>}
             </div>
         </div>
     );
 }
 
-function GridCell({ label, value, labelColor = "#94a3b8", valueColor = "#1e3a5f", sub }) {
+function GridCell({ label, value, labelColor = "#94a3b8", valueColor = "#1e3a5f", sub, late }) {
     return (
         <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: "0.65rem", color: labelColor, marginBottom: "2px" }}>{label}</div>
             <div style={{ fontSize: "0.85rem", fontWeight: "700", color: valueColor }}>{value}</div>
             {sub && <div style={{ fontSize: "0.6rem", color: "#60a5fa" }}>{sub}</div>}
+            {late && <div style={{ fontSize: "0.6rem", color: "#ea580c", fontWeight: "600" }}>{late}</div>}
         </div>
     );
 }
