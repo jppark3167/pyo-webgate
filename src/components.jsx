@@ -400,7 +400,7 @@ export function DashView({
                                     <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
                                         <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
                                     </td>
-                                    <td style={tdStyle}>{renderStatusBadge(item._status)}</td>
+                                    <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{renderStatusBadge(item._status)}</td>
                                     <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "0.65rem", wordBreak: "break-all" }}>{item.출하의뢰번호}</td>
                                     <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
                                     <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>

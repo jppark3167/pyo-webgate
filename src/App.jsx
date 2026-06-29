@@ -190,7 +190,7 @@ export default function App() {
   const shipEnriched = useMemo(() => {
     return [...shipData]
       .map(r => {
-        const isCarriage = str(r.품목명).includes("운반비");
+        const isCarriage = str(r.품목명).includes("운반비") || str(r.품목명).includes("기타");
         if (isCarriage) return {
           ...r, _currentInvQty: null, _incomingProd: 0, _prodDates: [],
           _kceIncoming: 0, _kceDates: [], _projectedInvQty: null,
@@ -228,6 +228,7 @@ export default function App() {
           _note: note,
         };
       })
+      .filter(item => item._status !== "skip")
       .sort((a, b) => str(a.납기일자).localeCompare(str(b.납기일자)));
   }, [shipData, invData, prodQtyMap, kceQtyMap]);
 
