@@ -124,22 +124,27 @@ export default function App() {
 
       const parsed = rows.map(row => {
         const cols = row.split("\t").map(c => c.trim());
-        // 컬럼 순서: 품번 / 발주일 / 입고예정일 / 파입고수 / 발주요청 / KCE현황 / ...
+        // 컬럼 순서: 품번 / 발주수량 / 발주일 / 입고예정일(메모) / 발주요청 / 담당자
+
+        // 입고예정일: 메모 셀에서 첫 번째 날짜만 추출 (예: "136대 6/2\n64대-7/3" → "6/2")
+        const memoCell = cols[3] || "";
+        const dateMatch = memoCell.match(/(\d{1,2}\/\d{1,2})/);
+        const 입고예정일 = dateMatch ? `2026/${dateMatch[1].padStart(4, "0")}` : "";
+
         return {
           품번: cols[0],
-          발주일: cols[1],
-          입고예정일: cols[2],
-          파입고수: parseFloat(cols[3]?.replace(/,/g, "")) || 0,
+          발주수량: parseFloat(cols[1]?.replace(/,/g, "")) || 0,
+          발주일: cols[2],
+          입고예정일: 입고예정일,
           발주요청: parseFloat(cols[4]?.replace(/,/g, "")) || 0,
+          담당자: cols[5] || "",
         };
       }).filter(item => {
         if (!item.품번) return false;
-        // 입고예정일이 오늘 이후인 것만 (과거 입고 제외)
         if (item.입고예정일) {
-          const d = new Date(item.입고예정일.replace(/\./g, "-"));
+          const d = new Date(item.입고예정일.replace(/\//g, "-"));
           if (!isNaN(d) && d < today) return false;
         }
-        // 발주요청 수량이 있는 것만
         return item.발주요청 > 0;
       });
 
