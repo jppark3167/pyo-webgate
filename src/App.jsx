@@ -2,6 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { globalCss, str, num, findInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
 import { InputView, DashView } from "./components/index";
+import { Login } from "./components/Login";
 import { processProdFile, processInvFile } from "./excelParser";
 import { api } from "./api";
 
@@ -63,11 +64,15 @@ export default function App() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [shipSort, setShipSort] = useState({ key: "납기일자", dir: "desc" });
   const [loading, setLoading] = useState(true);
+  const [authed, setAuthed] = useState(api.isLoggedIn());
 
-  // ── 앱 시작 시 서버에서 전체 데이터 로드 ──────
+  // ── 로그인 후 서버에서 전체 데이터 로드 ──────
   useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
     api.getData()
       .then(db => {
+        if (cancelled) return;
         setProdData(db.prodData || []);
         setInvData(db.invData || []);
         setShipData(db.shipData || []);
@@ -76,9 +81,14 @@ export default function App() {
         setProdFile(db.prodFile || "");
         setInvFile(db.invFile || "");
       })
-      .catch(() => setParseMsg("⚠️ 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요."))
-      .finally(() => setLoading(false));
-  }, []);
+      .catch((e) => {
+        if (cancelled) return;
+        if (e.message === "UNAUTHORIZED") setAuthed(false);   // 토큰 만료/무효 → 로그인 화면
+        else setParseMsg("⚠️ 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요.");
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [authed]);
 
   // ── 전체 초기화 ───────────────────────────────
   const handleResetData = async () => {
@@ -406,6 +416,9 @@ export default function App() {
     });
   }, [shipEnriched]);
 
+  // ── 로그인 화면 ────────────────────────────────
+  if (!authed) return <Login onSuccess={() => { setLoading(true); setAuthed(true); }} />;
+
   // ── 로딩 화면 ──────────────────────────────────
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "'Pretendard','Malgun Gothic',sans-serif", color: "#64748b" }}>
@@ -428,13 +441,22 @@ export default function App() {
             <span style={{ fontSize: 18 }}>🏭</span>
             <div className="header-title" style={{ fontWeight: 700, fontSize: 15 }}>출하 일정관리</div>
           </div>
-          <button
-            className="header-btn"
-            onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }}
-            style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
-          >
-            {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              className="header-btn"
+              onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }}
+              style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+            >
+              {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
+            </button>
+            <button
+              className="header-btn"
+              onClick={() => { api.logout(); setAuthed(false); }}
+              style={{ background: "transparent", color: "#cbd5e1", border: "1px solid #ffffff33", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
         <div className="page-container" style={{ padding: "16px" }}>

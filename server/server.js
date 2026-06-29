@@ -4,10 +4,14 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 const { MongoClient } = require("mongodb");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI;
+// 접속 비밀번호 (운영에서는 반드시 환경변수 APP_PASSWORD 로 설정)
+const APP_PASSWORD = process.env.APP_PASSWORD || "pyo-webgate";
+const AUTH_TOKEN = crypto.createHash("sha256").update(APP_PASSWORD).digest("hex");
 
 let db;
 
@@ -46,6 +50,25 @@ app.use(express.json({ limit: "50mb" }));
 // React 빌드 정적 파일
 const BUILD_DIR = path.join(__dirname, "../dist");
 if (fs.existsSync(BUILD_DIR)) app.use(express.static(BUILD_DIR));
+
+// ── 인증 ───────────────────────────────────────
+// 로그인: 비밀번호 확인 후 토큰 발급 (공개)
+app.post("/api/login", (req, res) => {
+    const input = Buffer.from(String((req.body && req.body.password) || ""));
+    const expected = Buffer.from(APP_PASSWORD);
+    const ok = input.length === expected.length && crypto.timingSafeEqual(input, expected);
+    if (!ok) return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
+    res.json({ token: AUTH_TOKEN });
+});
+
+// 그 외 모든 /api 요청은 유효한 토큰 필요
+app.use("/api", (req, res, next) => {
+    if (req.path === "/login") return next();
+    const auth = req.headers.authorization || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (token !== AUTH_TOKEN) return res.status(401).json({ error: "인증이 필요합니다." });
+    next();
+});
 
 // ── API ───────────────────────────────────────
 
