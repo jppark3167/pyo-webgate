@@ -1,5 +1,5 @@
 export function InputView({
-    setView, handleResetData, parseMsg,
+    handleResetData, parseMsg,
     handleProdFile, prodData, prodFile,
     handleInvFile, invData, invFile,
     shipText, setShipText, handleShipParse,

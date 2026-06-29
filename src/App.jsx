@@ -29,7 +29,6 @@ export default function App() {
   const [parseMsg, setParseMsg] = useState(null);
   const [mainTab, setMainTab] = useState("ship_dom");
   const [search, setSearch] = useState("");
-  const [filterDate, setFilterDate] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [sortDesc, setSortDesc] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -306,39 +305,28 @@ export default function App() {
     ...r, _inv: findInv(invData, r.제품코드), _status: "prod_planned"
   })), [prodData, invData]);
 
-  // ── 통계 ───────────────────────────────────────
-  const prodStats = useMemo(() => {
-    const c = { ok: 0, shortage: 0, neg: 0, unknown: 0, prod_planned: 0 };
-    const activeData = mainTab === "ship_dom" ? shipDomEnriched : (mainTab === "ship_ovs" ? shipOvsEnriched : prodEnriched);
-    activeData.forEach(r => { if (r._status && c[r._status] !== undefined) c[r._status]++; });
-    return c;
-  }, [prodEnriched, shipDomEnriched, shipOvsEnriched, mainTab]);
-
   // ── 검색/필터 ──────────────────────────────────
   const filteredShipDom = useMemo(() => {
     const q = search.toLowerCase();
     return shipDomEnriched.filter(r =>
       (!q || r.거래처명?.toLowerCase().includes(q) || r.품목명?.toLowerCase().includes(q) || r.품목번호?.toLowerCase().includes(q)) &&
-      (!filterDate || r.납기일자 === filterDate) &&
       (filterStatus === "all" || r._status === filterStatus)
     );
-  }, [shipDomEnriched, search, filterDate, filterStatus]);
+  }, [shipDomEnriched, search, filterStatus]);
   const filteredShipOvs = useMemo(() => {
     const q = search.toLowerCase();
     return shipOvsEnriched.filter(r =>
       (!q || r.거래처명?.toLowerCase().includes(q) || r.품목명?.toLowerCase().includes(q) || r.품목번호?.toLowerCase().includes(q)) &&
-      (!filterDate || r.납기일자 === filterDate) &&
       (filterStatus === "all" || r._status === filterStatus)
     );
-  }, [shipOvsEnriched, search, filterDate, filterStatus]);
+  }, [shipOvsEnriched, search, filterStatus]);
   const filteredProd = useMemo(() => {
     const q = search.toLowerCase();
     return prodEnriched.filter(r =>
       (!q || r.고객명?.toLowerCase().includes(q) || r.모델명?.toLowerCase().includes(q) || r.제품코드?.toLowerCase().includes(q)) &&
-      (!filterDate || r.출하일자 === filterDate) &&
       (filterStatus === "all" || r._status === filterStatus)
     );
-  }, [prodEnriched, search, filterDate, filterStatus]);
+  }, [prodEnriched, search, filterStatus]);
 
   // ── 정렬 ───────────────────────────────────────
   const sortByDate = useCallback((data, key) => [...data].sort((a, b) => {
@@ -414,7 +402,6 @@ export default function App() {
         <div className="page-container" style={{ padding: "16px" }}>
           {view === "input" ? (
             <InputView
-              setView={setView}
               handleResetData={handleResetData}
               parseMsg={parseMsg}
               handleProdFile={handleProdFile}
@@ -435,7 +422,6 @@ export default function App() {
             <DashView
               mainTab={mainTab}
               setMainTab={setMainTab}
-              prodStats={prodStats}
               filterStatus={filterStatus}
               setFilterStatus={setFilterStatus}
               search={search}

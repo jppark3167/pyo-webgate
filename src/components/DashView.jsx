@@ -6,7 +6,7 @@ import { useIsMobile } from "./useIsMobile";
 import { tabStyle, activeTabStyle, tableStyle, theadTrStyle, theadStyle, thStyle, tbodyTrStyle, tdStyle } from "./styles";
 
 export function DashView({
-    mainTab, setMainTab, prodStats, filterStatus, setFilterStatus, search, setSearch,
+    mainTab, setMainTab, filterStatus, setFilterStatus, search, setSearch,
     sortDesc, setSortDesc, sortedShipDom, sortedShipOvs, sortedProd, prodSummaryData = [],
     dailySummaryData = [], allShipData = [], apiSaveMemo = null, initialMemos = null
 }) {
@@ -145,9 +145,11 @@ export function DashView({
     );
 }
 
-// 생산예정/KCE 입고 셀 — 납기일까지 들어오는 양(정상)과 늦게 들어오는 양(지연)을 구분 표시
-function IncomingCell({ qty, dates, lateQty, lateDates, color, dateColor }) {
-    if (!qty && !lateQty) return <td style={tdStyle}><span style={{ color: "#94a3b8" }}>-</span></td>;
+// 생산예정/KCE 입고 셀 — 납기일까지 들어오는 양(정상) 표시.
+// 지연(납기일 이후 도착)은 그 건이 실제 재고부족(예상재고<0)일 때만 부족 사유로 표시.
+function IncomingCell({ qty, dates, lateQty, lateDates, color, dateColor, showLate }) {
+    const late = showLate && lateQty > 0;
+    if (!qty && !late) return <td style={tdStyle}><span style={{ color: "#94a3b8" }}>-</span></td>;
     return (
         <td style={tdStyle}>
             <div style={{ whiteSpace: "nowrap" }}>
@@ -157,7 +159,7 @@ function IncomingCell({ qty, dates, lateQty, lateDates, color, dateColor }) {
                         {dates?.length > 0 && <div style={{ fontSize: "0.6rem", color: dateColor }}>{dates.map(d => fmtD(d)).join(", ")}</div>}
                     </>
                     : <span style={{ color: "#cbd5e1" }}>-</span>}
-                {lateQty > 0 && (
+                {late && (
                     <div style={{ fontSize: "0.6rem", color: "#ea580c", marginTop: "2px", fontWeight: "600" }}>
                         ⏰지연 +{lateQty}
                         {lateDates?.length > 0 && <span style={{ fontWeight: "400" }}> ({lateDates.map(d => fmtD(d)).join(", ")})</span>}
@@ -183,8 +185,8 @@ function ShipRow({ item }) {
             </td>
             <td style={{ ...tdStyle, fontWeight: "600", whiteSpace: "nowrap" }}>{item.수량}</td>
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item._currentInvQty ?? "-"}</td>
-            <IncomingCell qty={item._incomingProd} dates={item._prodDates} lateQty={item._incomingProdLate} lateDates={item._prodLateDates} color="#2563eb" dateColor="#60a5fa" />
-            <IncomingCell qty={item._kceIncoming} dates={item._kceDates} lateQty={item._kceIncomingLate} lateDates={item._kceLateDates} color="#1e40af" dateColor="#3b82f6" />
+            <IncomingCell qty={item._incomingProd} dates={item._prodDates} lateQty={item._incomingProdLate} lateDates={item._prodLateDates} color="#2563eb" dateColor="#60a5fa" showLate={item._projectedInvQty < 0} />
+            <IncomingCell qty={item._kceIncoming} dates={item._kceDates} lateQty={item._kceIncomingLate} lateDates={item._kceLateDates} color="#1e40af" dateColor="#3b82f6" showLate={item._projectedInvQty < 0} />
             <td style={{ ...tdStyle, fontWeight: "700", color: item._projectedInvQty < 0 ? "#ef4444" : "#334155" }}>
                 <div style={{ whiteSpace: "nowrap" }}>{item._projectedInvQty ?? "-"}</div>
             </td>

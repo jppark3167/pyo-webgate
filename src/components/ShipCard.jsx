@@ -38,11 +38,11 @@ export function ShipCard({ item }) {
                 <GridCell label="생산예정" value={item._incomingProd > 0 ? `+${item._incomingProd}` : "-"}
                     labelColor="#2563eb" valueColor={item._incomingProd > 0 ? "#2563eb" : "#94a3b8"}
                     sub={item._incomingProd > 0 && item._prodDates?.length > 0 ? item._prodDates.map(d => fmtD(d)).join(", ") : null}
-                    late={item._incomingProdLate > 0 ? `⏰+${item._incomingProdLate}` : null} />
+                    late={item._projectedInvQty < 0 && item._incomingProdLate > 0 ? `⏰+${item._incomingProdLate}` : null} />
                 <GridCell label="KCE입고" value={item._kceIncoming > 0 ? `+${item._kceIncoming}` : "-"}
                     labelColor="#1e40af" valueColor={item._kceIncoming > 0 ? "#1e40af" : "#94a3b8"}
                     sub={item._kceIncoming > 0 && item._kceDates?.length > 0 ? item._kceDates.map(d => fmtD(d)).join(", ") : null}
-                    late={item._kceIncomingLate > 0 ? `⏰+${item._kceIncomingLate}` : null} />
+                    late={item._projectedInvQty < 0 && item._kceIncomingLate > 0 ? `⏰+${item._kceIncomingLate}` : null} />
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "0.5rem" }}>
