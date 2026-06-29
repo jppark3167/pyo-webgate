@@ -25,10 +25,30 @@ function readDB() {
 
 function writeDB(data) {
     data.updatedAt = new Date().toISOString();
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf-8");
+    // 안전한 저장: temp 파일에 먼저 쓰고 교체
+    const tmp = DB_FILE + ".tmp";
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
+    fs.renameSync(tmp, DB_FILE);
 }
 
-app.use(cors());
+// CORS 설정 - 허용할 도메인만 명시
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3001",
+    "https://parkjunpyo.store",
+    "https://www.parkjunpyo.store",
+];
+app.use(cors({
+    origin: (origin, callback) => {
+        // origin이 없으면 같은 서버에서 온 요청 (허용)
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    }
+}));
+
 app.use(express.json({ limit: "50mb" }));
 
 // React 빌드 정적 파일
