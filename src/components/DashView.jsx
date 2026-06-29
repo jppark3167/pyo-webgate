@@ -7,7 +7,7 @@ import { tabStyle, activeTabStyle, tableStyle, theadTrStyle, theadStyle, thStyle
 
 export function DashView({
     mainTab, setMainTab, filterStatus, setFilterStatus, search, setSearch,
-    sortDesc, setSortDesc, sortedShipDom, sortedShipOvs, sortedProd, prodSummaryData = [],
+    shipSort, onShipSort, sortedShipDom, sortedShipOvs, sortedProd, prodSummaryData = [],
     dailySummaryData = [], allShipData = [], apiSaveMemo = null, initialMemos = null
 }) {
     const isMobile = useIsMobile();
@@ -32,6 +32,22 @@ export function DashView({
     else if (mainTab === "ship_ovs") activeData = sortedShipOvs;
     else if (mainTab === "prod") activeData = sortedProd;
 
+    // 정렬 가능한 헤더 셀 (클릭 시 정렬, 활성 컬럼은 ▲/▼ 표시)
+    const sortTh = (label, width, align, color) => {
+        const active = shipSort?.key === label;
+        const arrow = active ? (shipSort.dir === "asc" ? "▲" : "▼") : "↕";
+        return (
+            <th onClick={() => onShipSort(label)}
+                style={{
+                    ...thStyle, width, cursor: "pointer", userSelect: "none",
+                    ...(align === "left" ? { textAlign: "left", paddingLeft: "0.5rem" } : {}),
+                    color: color || (active ? "#1e3a5f" : thStyle.color),
+                }}>
+                {label}<span style={{ fontSize: "0.6rem", marginLeft: "2px", color: active ? (color || "#1e3a5f") : "#cbd5e1" }}>{arrow}</span>
+            </th>
+        );
+    };
+
     return (
         <div style={{ padding: isMobile ? "0.375rem" : "0.5rem" }}>
 
@@ -55,9 +71,21 @@ export function DashView({
                         <option value="ok">이상없음</option>
                         <option value="shortage">재고부족</option>
                     </select>
-                    <button onClick={() => setSortDesc(!sortDesc)}
+                    <select value={shipSort.key} onChange={(e) => onShipSort(e.target.value)}
+                        style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", border: "1px solid #cbd5e1", borderRadius: "6px" }}>
+                        <option value="납기일자">납기일</option>
+                        <option value="의뢰처명">의뢰처</option>
+                        <option value="품목명">품목명</option>
+                        <option value="수량">수량</option>
+                        <option value="현재고">현재고</option>
+                        <option value="생산예정">생산예정</option>
+                        <option value="KCE 입고">KCE입고</option>
+                        <option value="예상재고">예상재고</option>
+                        <option value="상태">상태</option>
+                    </select>
+                    <button onClick={() => onShipSort(shipSort.key)}
                         style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
-                        {sortDesc ? "날짜▽" : "날짜△"}
+                        {shipSort.dir === "asc" ? "▲ 오름" : "▼ 내림"}
                     </button>
                 </div>
             )}
@@ -90,15 +118,15 @@ export function DashView({
                         <thead style={theadStyle}>
                             <tr style={theadTrStyle}>
                                 {mainTab.includes("ship") && (<>
-                                    <th style={{ ...thStyle, width: "6%" }}>납기일자</th>
-                                    <th style={{ ...thStyle, width: "12%" }}>의뢰처명</th>
-                                    <th style={{ ...thStyle, width: "18%", textAlign: "left", paddingLeft: "0.5rem" }}>품목명</th>
-                                    <th style={{ ...thStyle, width: "5%" }}>수량</th>
-                                    <th style={{ ...thStyle, width: "5%" }}>현재고</th>
-                                    <th style={{ ...thStyle, width: "7%" }}>생산예정</th>
-                                    <th style={{ ...thStyle, width: "7%", color: "#1e40af" }}>KCE 입고</th>
-                                    <th style={{ ...thStyle, width: "8%" }}>예상재고</th>
-                                    <th style={{ ...thStyle, width: "7%" }}>상태</th>
+                                    {sortTh("납기일자", "6%")}
+                                    {sortTh("의뢰처명", "12%")}
+                                    {sortTh("품목명", "18%", "left")}
+                                    {sortTh("수량", "5%")}
+                                    {sortTh("현재고", "5%")}
+                                    {sortTh("생산예정", "7%")}
+                                    {sortTh("KCE 입고", "7%", null, "#1e40af")}
+                                    {sortTh("예상재고", "8%")}
+                                    {sortTh("상태", "7%")}
                                     <th style={{ ...thStyle, width: "10%" }}>의뢰번호</th>
                                     <th style={{ ...thStyle, width: "5%" }}>담당</th>
                                     <th style={{ ...thStyle, width: "10%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>

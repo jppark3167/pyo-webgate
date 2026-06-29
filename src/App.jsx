@@ -14,6 +14,37 @@ const byDueDate = (a, b) => {
   return da.localeCompare(db);
 };
 
+// 출하의뢰 정렬: 컬럼 → {필드, 타입, 첫 클릭 기본방향}
+const SHIP_SORT = {
+  "납기일자": { field: "납기일자", type: "date", dir: "desc" },   // 최근순
+  "의뢰처명": { field: "거래처명", type: "ko", dir: "asc" },       // 가나다
+  "품목명": { field: "품목명", type: "ko", dir: "asc" },           // abc
+  "수량": { field: "수량", type: "num", dir: "asc" },              // 작은순
+  "현재고": { field: "_currentInvQty", type: "num", dir: "asc" },
+  "생산예정": { field: "_incomingProd", type: "num", dir: "asc" },
+  "KCE 입고": { field: "_kceIncoming", type: "num", dir: "asc" },
+  "예상재고": { field: "_projectedInvQty", type: "num", dir: "asc" },
+  "상태": { field: "_status", type: "status", dir: "asc" },        // 재고부족 먼저
+};
+const STATUS_RANK = { shortage: 0, ok: 1 };
+
+function shipComparator(key, dir) {
+  const cfg = SHIP_SORT[key] || SHIP_SORT["납기일자"];
+  const sign = dir === "desc" ? -1 : 1;
+  return (a, b) => {
+    if (cfg.type === "date") {
+      const da = normDate(a[cfg.field]), db = normDate(b[cfg.field]);
+      if (!da && !db) return 0;
+      if (!da) return 1;          // 날짜 없는 건 방향과 무관하게 항상 뒤로
+      if (!db) return -1;
+      return sign * da.localeCompare(db);
+    }
+    if (cfg.type === "num") return sign * ((Number(a[cfg.field]) || 0) - (Number(b[cfg.field]) || 0));
+    if (cfg.type === "status") return sign * ((STATUS_RANK[a[cfg.field]] ?? 9) - (STATUS_RANK[b[cfg.field]] ?? 9));
+    return sign * str(a[cfg.field]).localeCompare(str(b[cfg.field]), "ko");
+  };
+}
+
 export default function App() {
   const [prodData, setProdData] = useState([]);
   const [invData, setInvData] = useState([]);
@@ -30,7 +61,7 @@ export default function App() {
   const [mainTab, setMainTab] = useState("ship_dom");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [sortDesc, setSortDesc] = useState(false);
+  const [shipSort, setShipSort] = useState({ key: "납기일자", dir: "desc" });
   const [loading, setLoading] = useState(true);
 
   // ── 앱 시작 시 서버에서 전체 데이터 로드 ──────
@@ -329,15 +360,20 @@ export default function App() {
   }, [prodEnriched, search, filterStatus]);
 
   // ── 정렬 ───────────────────────────────────────
-  const sortByDate = useCallback((data, key) => [...data].sort((a, b) => {
-    const vA = a[key], vB = b[key];
-    if (!vA && !vB) return 0; if (!vA) return 1; if (!vB) return -1;
-    return sortDesc ? vB.localeCompare(vA) : vA.localeCompare(vB);
-  }), [sortDesc]);
+  // 헤더 클릭: 같은 컬럼이면 방향 토글, 다른 컬럼이면 그 컬럼의 기본방향으로
+  const handleShipSort = useCallback((key) => {
+    setShipSort(prev => prev.key === key
+      ? { key, dir: prev.dir === "asc" ? "desc" : "asc" }
+      : { key, dir: (SHIP_SORT[key] || {}).dir || "asc" });
+  }, []);
 
-  const sortedShipDom = useMemo(() => sortByDate(filteredShipDom, "납기일자"), [filteredShipDom, sortByDate]);
-  const sortedShipOvs = useMemo(() => sortByDate(filteredShipOvs, "납기일자"), [filteredShipOvs, sortByDate]);
-  const sortedProd = useMemo(() => sortByDate(filteredProd, "생산계획일자"), [filteredProd, sortByDate]);
+  const sortedShipDom = useMemo(() => [...filteredShipDom].sort(shipComparator(shipSort.key, shipSort.dir)), [filteredShipDom, shipSort]);
+  const sortedShipOvs = useMemo(() => [...filteredShipOvs].sort(shipComparator(shipSort.key, shipSort.dir)), [filteredShipOvs, shipSort]);
+  const sortedProd = useMemo(() => [...filteredProd].sort((a, b) => {
+    const da = normDate(a.생산계획일자), db = normDate(b.생산계획일자);
+    if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+    return da.localeCompare(db);
+  }), [filteredProd]);
 
   // ── 요약 데이터 ────────────────────────────────
   const prodSummaryData = useMemo(() => {
@@ -426,8 +462,8 @@ export default function App() {
               setFilterStatus={setFilterStatus}
               search={search}
               setSearch={setSearch}
-              sortDesc={sortDesc}
-              setSortDesc={setSortDesc}
+              shipSort={shipSort}
+              onShipSort={handleShipSort}
               sortedShipDom={sortedShipDom}
               sortedShipOvs={sortedShipOvs}
               sortedProd={sortedProd}
