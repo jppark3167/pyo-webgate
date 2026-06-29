@@ -1,7 +1,8 @@
-// server.js - 출하 일정관리 백엔드 (MongoDB 버전)
+// server.js - 출하 일정관리 백엔드 (MongoDB 컬렉션 분리 버전)
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const fs = require("fs");
 const { MongoClient } = require("mongodb");
 
 const app = express();
@@ -16,25 +17,6 @@ async function connectDB() {
     await client.connect();
     db = client.db("pyo-webgate");
     console.log("✅ MongoDB 연결 성공");
-}
-
-const DEFAULT_DB = {
-    prodData: [], invData: [], shipData: [], kceData: [],
-    memos: {}, prodFile: "", invFile: "", updatedAt: null
-};
-
-async function readDB() {
-    const doc = await db.collection("appdata").findOne({ _id: "main" });
-    return doc ? { ...DEFAULT_DB, ...doc } : { ...DEFAULT_DB };
-}
-
-async function writeDB(data) {
-    data.updatedAt = new Date().toISOString();
-    await db.collection("appdata").updateOne(
-        { _id: "main" },
-        { $set: data },
-        { upsert: true }
-    );
 }
 
 // CORS 설정
@@ -58,68 +40,121 @@ app.use(express.json({ limit: "50mb" }));
 
 // React 빌드 정적 파일
 const BUILD_DIR = path.join(__dirname, "../dist");
-const fs = require("fs");
 if (fs.existsSync(BUILD_DIR)) app.use(express.static(BUILD_DIR));
 
 // ── API ───────────────────────────────────────
 
+// 전체 데이터 조회
 app.get("/api/data", async (req, res) => {
-    try { res.json(await readDB()); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const [shipData, prodData, invData, kceData, memosDocs, metaDocs] = await Promise.all([
+            db.collection("shipData").find().toArray(),
+            db.collection("prodData").find().toArray(),
+            db.collection("invData").find().toArray(),
+            db.collection("kceData").find().toArray(),
+            db.collection("memos").find().toArray(),
+            db.collection("meta").find().toArray(),
+        ]);
+
+        // memos: [{key, value}] → {key: value} 형태로 변환
+        const memos = {};
+        memosDocs.forEach(m => { memos[m.key] = m.value; });
+
+        // meta에서 파일명 가져오기
+        const meta = {};
+        metaDocs.forEach(m => { meta[m._id] = m.value; });
+
+        res.json({
+            shipData: shipData.map(({ _id, ...rest }) => rest),
+            prodData: prodData.map(({ _id, ...rest }) => rest),
+            invData: invData.map(({ _id, ...rest }) => rest),
+            kceData: kceData.map(({ _id, ...rest }) => rest),
+            memos,
+            prodFile: meta.prodFile || "",
+            invFile: meta.invFile || "",
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 출하의뢰 저장 (전체 교체)
 app.post("/api/ship", async (req, res) => {
     try {
         const { shipData } = req.body;
         if (!Array.isArray(shipData)) return res.status(400).json({ error: "배열 필요" });
-        const db2 = await readDB(); db2.shipData = shipData; await writeDB(db2);
+        await db.collection("shipData").deleteMany({});
+        if (shipData.length > 0) await db.collection("shipData").insertMany(shipData);
         res.json({ ok: true, count: shipData.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 재고현황 저장 (전체 교체)
 app.post("/api/inv", async (req, res) => {
     try {
         const { invData, fileName } = req.body;
         if (!Array.isArray(invData)) return res.status(400).json({ error: "배열 필요" });
-        const db2 = await readDB(); db2.invData = invData; db2.invFile = fileName || ""; await writeDB(db2);
+        await db.collection("invData").deleteMany({});
+        if (invData.length > 0) await db.collection("invData").insertMany(invData);
+        await db.collection("meta").updateOne(
+            { _id: "invFile" }, { $set: { value: fileName || "" } }, { upsert: true }
+        );
         res.json({ ok: true, count: invData.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 생산계획 저장 (전체 교체)
 app.post("/api/prod", async (req, res) => {
     try {
         const { prodData, fileName } = req.body;
         if (!Array.isArray(prodData)) return res.status(400).json({ error: "배열 필요" });
-        const db2 = await readDB(); db2.prodData = prodData; db2.prodFile = fileName || ""; await writeDB(db2);
+        await db.collection("prodData").deleteMany({});
+        if (prodData.length > 0) await db.collection("prodData").insertMany(prodData);
+        await db.collection("meta").updateOne(
+            { _id: "prodFile" }, { $set: { value: fileName || "" } }, { upsert: true }
+        );
         res.json({ ok: true, count: prodData.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// KCE 입고일정 저장 (전체 교체)
 app.post("/api/kce", async (req, res) => {
     try {
         const { kceData } = req.body;
         if (!Array.isArray(kceData)) return res.status(400).json({ error: "배열 필요" });
-        const db2 = await readDB(); db2.kceData = kceData; await writeDB(db2);
+        await db.collection("kceData").deleteMany({});
+        if (kceData.length > 0) await db.collection("kceData").insertMany(kceData);
         res.json({ ok: true, count: kceData.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 메모 단건 저장/삭제
 app.patch("/api/memos", async (req, res) => {
     try {
         const { key, value } = req.body;
         if (!key) return res.status(400).json({ error: "key 필요" });
-        const db2 = await readDB();
-        if (!db2.memos) db2.memos = {};
-        if (value === "" || value == null) delete db2.memos[key];
-        else db2.memos[key] = value;
-        await writeDB(db2);
+        if (value === "" || value == null) {
+            await db.collection("memos").deleteOne({ key });
+        } else {
+            await db.collection("memos").updateOne(
+                { key }, { $set: { key, value } }, { upsert: true }
+            );
+        }
         res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 전체 초기화
 app.delete("/api/data", async (req, res) => {
-    try { await writeDB({ ...DEFAULT_DB }); res.json({ ok: true }); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        await Promise.all([
+            db.collection("shipData").deleteMany({}),
+            db.collection("prodData").deleteMany({}),
+            db.collection("invData").deleteMany({}),
+            db.collection("kceData").deleteMany({}),
+            db.collection("memos").deleteMany({}),
+            db.collection("meta").deleteMany({}),
+        ]);
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // SPA fallback
