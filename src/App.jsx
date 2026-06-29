@@ -1,7 +1,7 @@
 // App.jsx: 메인 애플리케이션 컴포넌트 (서버 연동 + KCE 입고일정 버전)
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { globalCss, str, findInv } from "./utils";
-import { InputView, DashView } from "./components";
+import { InputView, DashView } from "./components/index";
 import { processProdFile, processInvFile } from "./excelParser";
 import { api } from "./api";
 
@@ -250,17 +250,22 @@ export default function App() {
   }, [prodEnriched, shipDomEnriched, shipOvsEnriched, mainTab]);
 
   // ── 검색/필터 ──────────────────────────────────
-  const filterShipData = (data) => {
+  const filteredShipDom = useMemo(() => {
     const q = search.toLowerCase();
-    return data.filter(r =>
+    return shipDomEnriched.filter(r =>
       (!q || r.거래처명?.toLowerCase().includes(q) || r.품목명?.toLowerCase().includes(q) || r.품목번호?.toLowerCase().includes(q)) &&
       (!filterDate || r.납기일자 === filterDate) &&
       (filterStatus === "all" || r._status === filterStatus)
     );
-  };
-
-  const filteredShipDom = useMemo(() => filterShipData(shipDomEnriched), [shipDomEnriched, search, filterDate, filterStatus]);
-  const filteredShipOvs = useMemo(() => filterShipData(shipOvsEnriched), [shipOvsEnriched, search, filterDate, filterStatus]);
+  }, [shipDomEnriched, search, filterDate, filterStatus]);
+  const filteredShipOvs = useMemo(() => {
+    const q = search.toLowerCase();
+    return shipOvsEnriched.filter(r =>
+      (!q || r.거래처명?.toLowerCase().includes(q) || r.품목명?.toLowerCase().includes(q) || r.품목번호?.toLowerCase().includes(q)) &&
+      (!filterDate || r.납기일자 === filterDate) &&
+      (filterStatus === "all" || r._status === filterStatus)
+    );
+  }, [shipOvsEnriched, search, filterDate, filterStatus]);
   const filteredProd = useMemo(() => {
     const q = search.toLowerCase();
     return prodEnriched.filter(r =>
@@ -271,19 +276,15 @@ export default function App() {
   }, [prodEnriched, search, filterDate, filterStatus]);
 
   // ── 정렬 ───────────────────────────────────────
-  const sortShipData = (data) => [...data].sort((a, b) => {
-    const vA = a.납기일자, vB = b.납기일자;
+  const sortByDate = useCallback((data, key) => [...data].sort((a, b) => {
+    const vA = a[key], vB = b[key];
     if (!vA && !vB) return 0; if (!vA) return 1; if (!vB) return -1;
     return sortDesc ? vB.localeCompare(vA) : vA.localeCompare(vB);
-  });
+  }), [sortDesc]);
 
-  const sortedShipDom = useMemo(() => sortShipData(filteredShipDom), [filteredShipDom, sortDesc]);
-  const sortedShipOvs = useMemo(() => sortShipData(filteredShipOvs), [filteredShipOvs, sortDesc]);
-  const sortedProd = useMemo(() => [...filteredProd].sort((a, b) => {
-    const vA = a.생산계획일자, vB = b.생산계획일자;
-    if (!vA && !vB) return 0; if (!vA) return 1; if (!vB) return -1;
-    return sortDesc ? vB.localeCompare(vA) : vA.localeCompare(vB);
-  }), [filteredProd, sortDesc]);
+  const sortedShipDom = useMemo(() => sortByDate(filteredShipDom, "납기일자"), [filteredShipDom, sortByDate]);
+  const sortedShipOvs = useMemo(() => sortByDate(filteredShipOvs, "납기일자"), [filteredShipOvs, sortByDate]);
+  const sortedProd = useMemo(() => sortByDate(filteredProd, "생산계획일자"), [filteredProd, sortByDate]);
 
   // ── 요약 데이터 ────────────────────────────────
   const prodSummaryData = useMemo(() => {

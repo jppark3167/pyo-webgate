@@ -16,7 +16,6 @@ export const globalCss = `
 
 // ── 유틸리티 함수 ──────────────────────────────────────────
 export const fmtD = s => s?.length >= 10 ? s.slice(5) : (s || "-");
-export const fmtN = n => (typeof n === "number") ? n.toLocaleString("ko-KR") : (n ?? "-");
 export const str = v => (v === null || v === undefined) ? "" : String(v).trim();
 export const num = v => {
     if (v === null || v === undefined || v === "") return 0;
@@ -35,45 +34,6 @@ export function fmtXlDate(v) {
     return String(v).slice(0, 10);
 }
 
-export function parseExcelDynamic(rawArray, keyIdentifiers) {
-    let headerIdx = -1;
-    let headers = [];
-
-    // 1. 헤더 행 찾기 (엑셀 상단 20행 이내에서 검색하여 오류 방지)
-    for (let i = 0; i < Math.min(rawArray.length, 20); i++) {
-        const rowStr = rawArray[i].join("").replace(/\s/g, "");
-
-        // keyIdentifiers 배열에 있는 핵심 키워드가 포함된 행을 헤더로 간주
-        if (keyIdentifiers.some(k => rowStr.includes(k.replace(/\s/g, "")))) {
-            headerIdx = i;
-            headers = rawArray[i].map(h => (h ? String(h).trim() : ""));
-            break;
-        }
-    }
-
-    // 헤더를 찾지 못한 경우 빈 배열 반환
-    if (headerIdx === -1) return [];
-
-    // 2. 데이터 행 파싱
-    const parsedData = [];
-    for (let i = headerIdx + 1; i < rawArray.length; i++) {
-        const row = rawArray[i];
-
-        // 완전히 비어있는 행은 무시
-        if (!row || row.every(cell => cell === "" || cell === null || cell === undefined)) continue;
-
-        const rowObj = {};
-        headers.forEach((header, colIdx) => {
-            if (header) {
-                rowObj[header] = row[colIdx];
-            }
-        });
-        parsedData.push(rowObj);
-    }
-
-    return parsedData;
-}
-
 // 오직 '품번(Item Code)'으로만 엄격하게 1:1 매칭
 export function findInv(invData, itemCode) {
     if (!itemCode) return null;
@@ -81,27 +41,3 @@ export function findInv(invData, itemCode) {
     return invData.find(r => str(r.품번).toUpperCase() === cCode) || null;
 }
 
-export function shipStatus(invQty, needed) {
-    if (invQty === null || invQty === undefined) return "unknown";
-    if (invQty < 0) return "neg";
-    if (invQty >= needed) return "ok";
-    return "shortage";
-}
-
-// ── 상수 ────────────────────────────────────────────────
-export const STATUS = {
-    ok: { bg: "#dcfce7", bdr: "#86efac", txt: "#166534", label: "출하가능" },
-    shortage: { bg: "#fee2e2", bdr: "#fca5a5", txt: "#991b1b", label: "재고부족" },
-    neg: { bg: "#fff1f2", bdr: "#fda4af", txt: "#9f1239", label: "마이너스" },
-    unknown: { bg: "#fef9c3", bdr: "#fde047", txt: "#713f12", label: "미확인" },
-};
-
-export const TH = { background: "#f8fafc", padding: "8px 10px", fontSize: 12, color: "#475569", fontWeight: 700, borderBottom: "1px solid #e2e8f0", whiteSpace: "nowrap" };
-export const TD = { padding: "8px 10px", fontSize: 13, color: "#374151", borderBottom: "1px solid #f1f5f9", verticalAlign: "middle", whiteSpace: "nowrap" };
-
-export const loadData = (key) => {
-    try {
-        const saved = localStorage.getItem(key);
-        return saved ? JSON.parse(saved) : [];
-    } catch (e) { return []; }
-};

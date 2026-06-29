@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { fmtXlDate, str, num, parseExcelDynamic } from "./utils";
+import { fmtXlDate, str, num } from "./utils";
 
 // 🏭 생산계획 파일 파싱 로직
 export const processProdFile = (file, onSuccess, onError) => {
