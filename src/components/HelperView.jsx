@@ -1,19 +1,30 @@
-// HelperView.jsx: 출하 도우미 — 퀵 배송 출하의뢰 지정 + 주소/박스수 입력 및 조회
+// HelperView.jsx: 출하 도우미 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회
 import { useState } from "react";
-import { quickKeyOf, buildQuickValue } from "../utils";
+import { quickKeyOf, buildQuickValue, toDateStr } from "../utils";
 import { MethodChip } from "./ShipMethod";
+
+// 보내는 사람 (고정값)
+const SENDER = {
+    lines: ["경기도 군포시 금정동 689-6", "한림벤처타운6층"],
+    company: "(주)웹게이트",
+    tel: "031-428-9302",
+    mobile: "010-4367-3167",
+};
 
 const inputStyle = { fontSize: "0.8rem", padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: 6, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 const btn = (bg, color) => ({ background: bg, color, border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" });
 
+// ── 퀵 지정 카드 (출하의뢰 한 건) ──────────────────
 function QuickCard({ qkey, row, saved, onSave }) {
     const isQuick = saved?.method === "퀵";
     const [addr, setAddr] = useState(saved?.address || "");
+    const [phone, setPhone] = useState(saved?.phone || "");
     const [box, setBox] = useState(saved?.boxCount ? String(saved.boxCount) : "");
 
     // 도우미에서의 지정은 항상 출하방법 = "퀵"
-    const commit = () => onSave(qkey, buildQuickValue(row, { method: "퀵", address: addr, boxCount: box }));
+    const commit = () => onSave(qkey, buildQuickValue(row, { method: "퀵", address: addr, boxCount: box, phone }));
     const release = () => onSave(qkey, null);
+    const onEnter = e => { if (e.key === "Enter") e.currentTarget.blur(); };
 
     return (
         <div style={{
@@ -42,25 +53,94 @@ function QuickCard({ qkey, row, saved, onSave }) {
 
             {isQuick && (
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
-                    <input
-                        value={addr}
-                        onChange={e => setAddr(e.target.value)}
-                        onBlur={commit}
-                        onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                        placeholder="배송 주소 입력"
-                        style={{ ...inputStyle, flex: "1 1 240px", minWidth: 0 }} />
+                    <input value={addr} onChange={e => setAddr(e.target.value)} onBlur={commit} onKeyDown={onEnter}
+                        placeholder="배송 주소" style={{ ...inputStyle, flex: "1 1 220px", minWidth: 0 }} />
+                    <input value={phone} onChange={e => setPhone(e.target.value)} onBlur={commit} onKeyDown={onEnter}
+                        placeholder="연락처" style={{ ...inputStyle, flex: "0 1 150px", minWidth: 0 }} />
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                        <input
-                            value={box}
-                            onChange={e => setBox(e.target.value.replace(/[^0-9]/g, ""))}
-                            onBlur={commit}
-                            onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
-                            placeholder="0" inputMode="numeric"
-                            style={{ ...inputStyle, width: 64, textAlign: "right" }} />
+                        <input value={box} onChange={e => setBox(e.target.value.replace(/[^0-9]/g, ""))} onBlur={commit} onKeyDown={onEnter}
+                            placeholder="0" inputMode="numeric" style={{ ...inputStyle, width: 64, textAlign: "right" }} />
                         <span style={{ fontSize: "0.78rem", color: "#64748b" }}>박스</span>
                     </div>
                 </div>
             )}
+        </div>
+    );
+}
+
+// ── 거래처별 배송 라벨 (송장 형식) ─────────────────
+const boxedLabel = { display: "inline-block", border: "1.5px solid #111", padding: "4px 12px", fontWeight: 700, fontSize: 15 };
+const itemCell = { border: "1px solid #111", padding: "5px 10px", fontSize: 15, whiteSpace: "nowrap" };
+
+function QuickLabel({ name, items }) {
+    const labelId = "qlabel-" + name.replace(/[^a-zA-Z0-9가-힣]/g, "");
+    const address = items.find(i => i.address)?.address || "";
+    const phone = items.find(i => i.phone)?.phone || "";
+    const totalBox = items.reduce((s, i) => s + (Number(i.boxCount) || 0), 0);
+    const method = items[0]?.method || "퀵";
+    const today = toDateStr(new Date());
+
+    const print = () => {
+        const el = document.getElementById(labelId);
+        if (!el) return;
+        const w = window.open("", "_blank", "width=960,height=680");
+        if (!w) return;
+        w.document.write(`<html><head><title>배송 라벨 - ${name}</title></head><body style="margin:0;padding:16px;font-family:'Malgun Gothic',sans-serif;">${el.outerHTML}</body></html>`);
+        w.document.close();
+        w.focus();
+        setTimeout(() => { w.print(); }, 200);
+    };
+
+    return (
+        <div style={{ marginBottom: 18 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ fontWeight: 700, color: "#334155" }}>
+                    {name} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: "0.8rem" }}>· {items.length}건 · {totalBox} Box</span>
+                </div>
+                <button style={btn("#1e3a5f", "#fff")} onClick={print}>🖨 인쇄</button>
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+                <div id={labelId} style={{ position: "relative", border: "1.5px solid #111", background: "#fff", color: "#111", width: 720, height: 470, padding: 24, boxSizing: "border-box", fontFamily: "'Malgun Gothic',sans-serif" }}>
+                    {/* 보내는 사람 */}
+                    <div style={{ position: "absolute", top: 24, left: 24 }}>
+                        <span style={boxedLabel}>보내는 사람</span>
+                        <span style={{ marginLeft: 14, fontSize: 13, fontWeight: 700 }}>{today}</span>
+                        <div style={{ fontSize: 18, marginTop: 8 }}>{SENDER.lines[0]}</div>
+                        <div style={{ fontSize: 18 }}>{SENDER.lines[1]}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 4 }}>{SENDER.company}</div>
+                        <div style={{ fontSize: 20, fontWeight: 700 }}>{SENDER.tel}</div>
+                        <div style={{ fontSize: 13, marginTop: 4 }}>{SENDER.mobile}</div>
+                    </div>
+
+                    {/* 품목 표 */}
+                    <table style={{ position: "absolute", top: 24, right: 24, borderCollapse: "collapse" }}>
+                        <tbody>
+                            {items.map((it, i) => (
+                                <tr key={i}>
+                                    <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{i + 1}</td>
+                                    <td style={{ ...itemCell, minWidth: 200 }}>{it.품목명 || "-"}</td>
+                                    <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{it.수량 ?? "-"}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {/* 출하방법 + 박스수 */}
+                    <div style={{ position: "absolute", top: 195, left: 90, textAlign: "center" }}>
+                        <div style={{ fontSize: 38, fontWeight: 700 }}>{method}</div>
+                        <div style={{ fontSize: 32, fontWeight: 700, marginTop: 22 }}>{totalBox} Box</div>
+                    </div>
+
+                    {/* 받는 사람 */}
+                    <div style={{ position: "absolute", top: 290, right: 24, left: 300, textAlign: "left" }}>
+                        <span style={boxedLabel}>받는사람</span>
+                        <div style={{ fontSize: 17, fontWeight: 700, marginTop: 10 }}>{address || "(주소 미입력)"}</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, marginTop: 10 }}>{name}</div>
+                        {phone && <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{phone}</div>}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
@@ -83,6 +163,14 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
 
     const quickEntries = Object.entries(quick).filter(([, v]) => v?.method === "퀵");
 
+    // 거래처명으로 그룹화 (배송 라벨 단위)
+    const groups = {};
+    quickEntries.forEach(([, v]) => {
+        const name = v.거래처명 || "(거래처 미지정)";
+        (groups[name] ||= []).push(v);
+    });
+    const groupList = Object.entries(groups);
+
     const tabBtn = (key, label) => (
         <button onClick={() => setTab(key)} style={{
             background: tab === key ? "#1e3a5f" : "#fff", color: tab === key ? "#fff" : "#475569",
@@ -95,7 +183,7 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
         <div>
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 {tabBtn("assign", "퀵 지정")}
-                {tabBtn("list", `퀵 조회 (${quickEntries.length})`)}
+                {tabBtn("list", `퀵 조회 (${groupList.length})`)}
             </div>
 
             {tab === "assign" ? (
@@ -113,10 +201,10 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
                         })}
                 </>
             ) : (
-                quickEntries.length === 0
+                groupList.length === 0
                     ? <Empty text="퀵으로 지정된 출하의뢰가 없습니다." />
-                    : quickEntries.map(([qkey, value]) => (
-                        <QuickCard key={qkey} qkey={qkey} row={value} saved={value} onSave={onSave} />
+                    : groupList.map(([name, items]) => (
+                        <QuickLabel key={name} name={name} items={items} />
                     ))
             )}
         </div>

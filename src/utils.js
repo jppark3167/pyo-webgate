@@ -128,10 +128,11 @@ export const SHIP_METHODS = [
 export const quickKeyOf = (r) => str(r.출하의뢰번호) || `${str(r.거래처명)}_${str(r.품목번호)}_${str(r.납기일자)}`;
 
 // 저장 값 = 출하방법 + 주소/박스수 + 조회용 스냅샷 (출하 리스트가 바뀌어도 조회 가능하도록)
-export function buildQuickValue(row, { method = "", address = "", boxCount = 0 } = {}) {
+export function buildQuickValue(row, { method = "", address = "", boxCount = 0, phone = "" } = {}) {
     return {
         method,
         address: (address || "").trim(),
+        phone: (phone || "").trim(),
         boxCount: Number(boxCount) || 0,
         거래처명: row.거래처명 || "",
         품목명: row.품목명 || "",

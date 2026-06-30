@@ -25,7 +25,7 @@ export function DashView({
             if (method == null) onSaveQuick(key, null);
             else {
                 const ex = quick[key] || {};
-                onSaveQuick(key, buildQuickValue(item, { method, address: ex.address, boxCount: ex.boxCount }));
+                onSaveQuick(key, buildQuickValue(item, { method, address: ex.address, boxCount: ex.boxCount, phone: ex.phone }));
             }
         }
         setMethodEditKey(null);
