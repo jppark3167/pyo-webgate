@@ -221,7 +221,7 @@ function ShipRow({ item }) {
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
                 {item._note
-                    ? <span style={{ color: item._noteType === "dup" ? "#dc2626" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>
+                    ? <span style={{ color: item._noteType === "dup" ? "#dc2626" : item._noteType === "esone" ? "#eab308" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>
                     : <span style={{ color: "#cbd5e1" }}>-</span>}
             </td>
         </tr>

@@ -52,7 +52,7 @@ export function ShipCard({ item }) {
                         {item._projectedInvQty ?? "-"}
                     </span>
                 </div>
-                {item._note && <span style={{ fontSize: "0.7rem", color: item._noteType === "dup" ? "#dc2626" : "#d97706", fontWeight: "700" }}>{item._note}</span>}
+                {item._note && <span style={{ fontSize: "0.7rem", color: item._noteType === "dup" ? "#dc2626" : item._noteType === "esone" ? "#eab308" : "#d97706", fontWeight: "700" }}>{item._note}</span>}
             </div>
         </div>
     );

@@ -319,8 +319,15 @@ export default function App() {
         const isDup = str(r.상태) !== "완료" && due && (ordersByDate[due]?.size >= 2);
         r._status = projected < 0 ? "shortage" : "ok";
         if (isDup && projected < 0) {
-          r._note = "중복 출하 확인필요";
-          r._noteType = "dup";
+          // 품목명이 VBR/VDR/VRN이면 에스원 KCE 물량으로 안내 (노란색)
+          const nm = str(r.품목명).toUpperCase();
+          if (nm.includes("VBR") || nm.includes("VDR") || nm.includes("VRN")) {
+            r._note = "에스원 KCE 물량";
+            r._noteType = "esone";
+          } else {
+            r._note = "중복 출하 확인필요";
+            r._noteType = "dup";
+          }
         } else {
           r._note = r._kceNote;
           r._noteType = r._kceNote ? "kce" : null;
