@@ -75,18 +75,23 @@ app.use("/api", (req, res, next) => {
 // 전체 데이터 조회
 app.get("/api/data", async (req, res) => {
     try {
-        const [shipData, prodData, invData, kceData, memosDocs, metaDocs] = await Promise.all([
+        const [shipData, prodData, invData, kceData, memosDocs, quickDocs, metaDocs] = await Promise.all([
             db.collection("shipData").find().toArray(),
             db.collection("prodData").find().toArray(),
             db.collection("invData").find().toArray(),
             db.collection("kceData").find().toArray(),
             db.collection("memos").find().toArray(),
+            db.collection("quickData").find().toArray(),
             db.collection("meta").find().toArray(),
         ]);
 
         // memos: [{key, value}] → {key: value} 형태로 변환
         const memos = {};
         memosDocs.forEach(m => { memos[m.key] = m.value; });
+
+        // quickData: [{key, value}] → {key: value} (value = {address, boxCount, ...스냅샷})
+        const quick = {};
+        quickDocs.forEach(q => { quick[q.key] = q.value; });
 
         // meta에서 파일명 가져오기
         const meta = {};
@@ -98,6 +103,7 @@ app.get("/api/data", async (req, res) => {
             invData: invData.map(({ _id, ...rest }) => rest),
             kceData: kceData.map(({ _id, ...rest }) => rest),
             memos,
+            quick,
             prodFile: meta.prodFile || "",
             invFile: meta.invFile || "",
         });
@@ -111,6 +117,8 @@ app.post("/api/ship", async (req, res) => {
         if (!Array.isArray(shipData)) return res.status(400).json({ error: "배열 필요" });
         await db.collection("shipData").deleteMany({});
         if (shipData.length > 0) await db.collection("shipData").insertMany(shipData);
+        // 출하의뢰가 새로 교체되면 기존 퀵 지정도 함께 초기화
+        await db.collection("quickData").deleteMany({});
         res.json({ ok: true, count: shipData.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -170,6 +178,22 @@ app.patch("/api/memos", async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// 퀵 배송정보 단건 저장/삭제 (value = {address, boxCount, ...스냅샷})
+app.patch("/api/quick", async (req, res) => {
+    try {
+        const { key, value } = req.body;
+        if (!key) return res.status(400).json({ error: "key 필요" });
+        if (value == null) {
+            await db.collection("quickData").deleteOne({ key });
+        } else {
+            await db.collection("quickData").updateOne(
+                { key }, { $set: { key, value } }, { upsert: true }
+            );
+        }
+        res.json({ ok: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 전체 초기화
 app.delete("/api/data", async (req, res) => {
     try {
@@ -179,6 +203,7 @@ app.delete("/api/data", async (req, res) => {
             db.collection("invData").deleteMany({}),
             db.collection("kceData").deleteMany({}),
             db.collection("memos").deleteMany({}),
+            db.collection("quickData").deleteMany({}),
             db.collection("meta").deleteMany({}),
         ]);
         res.json({ ok: true });

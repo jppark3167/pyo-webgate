@@ -52,6 +52,7 @@ export default function App() {
   const [shipData, setShipData] = useState([]);
   const [kceData, setKceData] = useState([]);
   const [memos, setMemos] = useState({});
+  const [quick, setQuick] = useState({});   // 퀵 배송정보: { key: {address, boxCount, ...스냅샷} }
 
   const [prodFile, setProdFile] = useState("");
   const [invFile, setInvFile] = useState("");
@@ -79,6 +80,7 @@ export default function App() {
         setShipData(db.shipData || []);
         setKceData(db.kceData || []);
         setMemos(db.memos || {});
+        setQuick(db.quick || {});
         setProdFile(db.prodFile || "");
         setInvFile(db.invFile || "");
       })
@@ -95,10 +97,22 @@ export default function App() {
   const handleResetData = async () => {
     if (!window.confirm("모든 데이터를 초기화하시겠습니까?")) return;
     await api.resetAll();
-    setProdData([]); setInvData([]); setShipData([]); setKceData([]); setMemos({});
+    setProdData([]); setInvData([]); setShipData([]); setKceData([]); setMemos({}); setQuick({});
     setProdFile(""); setInvFile(""); setShipText(""); setKceText("");
     setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
   };
+
+  // ── 퀵 배송정보 저장/해제 ─────────────────────
+  // value가 null이면 퀵 지정 해제, 객체면 저장(upsert)
+  const handleSaveQuick = useCallback(async (key, value) => {
+    setQuick(prev => {
+      const next = { ...prev };
+      if (value == null) delete next[key]; else next[key] = value;
+      return next;
+    });
+    try { await api.saveQuick(key, value); }
+    catch { setParseMsg("⚠️ 퀵 정보 저장에 실패했습니다. 새로고침 후 다시 시도하세요."); }
+  }, []);
 
   // ── 생산계획 파일 업로드 ─────────────────────
   const handleProdFile = useCallback(file => {
@@ -156,6 +170,7 @@ export default function App() {
 
       setShipData(parsedData);
       await api.saveShip(parsedData);
+      setQuick({});   // 출하의뢰 교체 시 기존 퀵 지정도 초기화 (서버와 동일)
       setParseMsg(`✅ ${parsedData.length}건의 출하의뢰 데이터가 성공적으로 입력되었습니다.`);
       setShipText("");
       setView("dash");
@@ -489,7 +504,7 @@ export default function App() {
 
         <div className="page-container" style={{ padding: "16px" }}>
           {screen === "helper" ? (
-            <HelperView />
+            <HelperView ships={shipData} quick={quick} onSave={handleSaveQuick} />
           ) : view === "input" ? (
             <InputView
               handleResetData={handleResetData}
