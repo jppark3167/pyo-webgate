@@ -1,7 +1,7 @@
 // App.jsx: 메인 애플리케이션 컴포넌트 (서버 연동 + KCE 입고일정 버전)
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { globalCss, str, num, findInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
-import { InputView, DashView } from "./components/index";
+import { InputView, DashView, HomeView, HelperView } from "./components/index";
 import { Login } from "./components/Login";
 import { processProdFile, processInvFile } from "./excelParser";
 import { api } from "./api";
@@ -55,6 +55,7 @@ export default function App() {
 
   const [prodFile, setProdFile] = useState("");
   const [invFile, setInvFile] = useState("");
+  const [screen, setScreen] = useState("home");   // home(분기) / dashboard / helper
   const [view, setView] = useState("dash");
   const [shipText, setShipText] = useState("");
   const [kceText, setKceText] = useState("");
@@ -424,7 +425,7 @@ export default function App() {
   }, [shipEnriched]);
 
   // ── 로그인 화면 ────────────────────────────────
-  if (!authed) return <Login onSuccess={() => { setLoading(true); setAuthed(true); }} />;
+  if (!authed) return <Login onSuccess={() => { setLoading(true); setScreen("home"); setAuthed(true); }} />;
 
   // ── 로딩 화면 ──────────────────────────────────
   if (loading) return (
@@ -435,6 +436,17 @@ export default function App() {
         {parseMsg && <div style={{ marginTop: 8, color: "#ef4444", fontSize: "0.875rem" }}>{parseMsg}</div>}
       </div>
     </div>
+  );
+
+  // ── 분기(랜딩) 화면 ────────────────────────────
+  if (screen === "home") return (
+    <>
+      <style>{globalCss}</style>
+      <HomeView
+        onSelect={(key) => { setScreen(key); setView("dash"); setParseMsg(null); }}
+        onLogout={() => { api.logout(); setAuthed(false); }}
+      />
+    </>
   );
 
   return (
@@ -451,11 +463,20 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <button
               className="header-btn"
-              onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }}
+              onClick={() => { setScreen("home"); setParseMsg(null); }}
               style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
-              {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
+              🏠 홈
             </button>
+            {screen === "dashboard" && (
+              <button
+                className="header-btn"
+                onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }}
+                style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+              >
+                {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
+              </button>
+            )}
             <button
               className="header-btn"
               onClick={() => { api.logout(); setAuthed(false); }}
@@ -467,7 +488,9 @@ export default function App() {
         </div>
 
         <div className="page-container" style={{ padding: "16px" }}>
-          {view === "input" ? (
+          {screen === "helper" ? (
+            <HelperView />
+          ) : view === "input" ? (
             <InputView
               handleResetData={handleResetData}
               parseMsg={parseMsg}

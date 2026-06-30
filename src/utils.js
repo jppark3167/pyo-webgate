@@ -4,6 +4,8 @@
 export const globalCss = `
   .swipe-menu { overflow-x: auto; -webkit-overflow-scrolling: touch; -ms-overflow-style: none; scrollbar-width: none; }
   .swipe-menu::-webkit-scrollbar { display: none; }
+  .home-card { transition: transform .12s ease, box-shadow .12s ease; }
+  .home-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(30,58,95,.28); }
   @media (max-width: 640px) {
     .header-title { font-size: 14px !important; }
     .header-btn { font-size: 11px !important; padding: 5px 10px !important; }
@@ -11,6 +13,7 @@ export const globalCss = `
     .stat-btn { font-size: 11px !important; padding: 6px 10px !important; }
     .tab-btn { font-size: 12px !important; padding: 10px 10px !important; }
     .table-th, .table-td { font-size: 11px !important; padding: 6px 8px !important; }
+    .home-card { width: 100% !important; height: 140px !important; }
   }
 `;
 
