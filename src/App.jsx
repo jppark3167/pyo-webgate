@@ -541,6 +541,8 @@ export default function App() {
               allShipData={shipEnriched}
               apiSaveMemo={api.saveMemo}
               initialMemos={memos}
+              quick={quick}
+              onSaveQuick={handleSaveQuick}
             />
           )}
         </div>

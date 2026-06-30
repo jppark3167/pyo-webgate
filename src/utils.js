@@ -115,3 +115,32 @@ export function findInv(invData, itemCode) {
     return invData.find(r => str(r.품번).toUpperCase() === cCode) || null;
 }
 
+// ── 퀵/출하방법 (quickData) 공용 ───────────────────────────
+// 출하방법 종류 + 칩 색상
+export const SHIP_METHODS = [
+    { key: "퀵", bg: "#dbeafe", color: "#1d4ed8" },
+    { key: "택배", bg: "#dcfce7", color: "#15803d" },
+    { key: "경동", bg: "#ede9fe", color: "#6d28d9" },
+    { key: "직납", bg: "#f1f5f9", color: "#94a3b8" },   // 연하게 표시
+];
+
+// 저장 식별자: 출하의뢰번호 우선, 없으면 거래처+품목번호+납기일자 (DashView 메모키와 동일 규칙)
+export const quickKeyOf = (r) => str(r.출하의뢰번호) || `${str(r.거래처명)}_${str(r.품목번호)}_${str(r.납기일자)}`;
+
+// 저장 값 = 출하방법 + 주소/박스수 + 조회용 스냅샷 (출하 리스트가 바뀌어도 조회 가능하도록)
+export function buildQuickValue(row, { method = "", address = "", boxCount = 0 } = {}) {
+    return {
+        method,
+        address: (address || "").trim(),
+        boxCount: Number(boxCount) || 0,
+        거래처명: row.거래처명 || "",
+        품목명: row.품목명 || "",
+        품목번호: row.품목번호 || "",
+        규격: row.규격 || "",
+        수량: row.수량 ?? "",
+        납기일자: row.납기일자 || "",
+        담당자: row.담당자 || "",
+        출하의뢰번호: row.출하의뢰번호 || "",
+    };
+}
+

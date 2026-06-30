@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { fmtD } from "../utils";
+import { fmtD, quickKeyOf, buildQuickValue } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
+import { MethodChip, MethodPicker } from "./ShipMethod";
 import { ShipCard } from "./ShipCard";
 import { useIsMobile } from "./useIsMobile";
 import { tabStyle, activeTabStyle, tableStyle, theadTrStyle, theadStyle, thStyle, tbodyTrStyle, tdStyle } from "./styles";
@@ -8,12 +9,31 @@ import { tabStyle, activeTabStyle, tableStyle, theadTrStyle, theadStyle, thStyle
 export function DashView({
     mainTab, setMainTab, filterStatus, setFilterStatus, search, setSearch,
     shipSort, onShipSort, sortedShipDom, sortedShipOvs, sortedProd, prodSummaryData = [],
-    dailySummaryData = [], allShipData = [], apiSaveMemo = null, initialMemos = null
+    dailySummaryData = [], allShipData = [], apiSaveMemo = null, initialMemos = null,
+    quick = {}, onSaveQuick = null
 }) {
     const isMobile = useIsMobile();
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedProdDate, setSelectedProdDate] = useState(null);
     const [editingKey, setEditingKey] = useState(null);
+    const [methodEditKey, setMethodEditKey] = useState(null);
+
+    // 출하방법 지정/해제 — 기존 주소·박스수는 보존, 해제 시 항목 삭제
+    const pickMethod = (item, method) => {
+        const key = quickKeyOf(item);
+        if (onSaveQuick) {
+            if (method == null) onSaveQuick(key, null);
+            else {
+                const ex = quick[key] || {};
+                onSaveQuick(key, buildQuickValue(item, { method, address: ex.address, boxCount: ex.boxCount }));
+            }
+        }
+        setMethodEditKey(null);
+    };
+    const toggleMethodEdit = (item) => {
+        const key = quickKeyOf(item);
+        setMethodEditKey(prev => prev === key ? null : key);
+    };
 
     const [memos, setMemos] = useState(() => {
         if (initialMemos) return initialMemos;
@@ -95,7 +115,16 @@ export function DashView({
                 <div style={{ paddingBottom: "1rem" }}>
                     {activeData.length === 0
                         ? <EmptyMessage />
-                        : activeData.map((item, idx) => <ShipCard key={idx} item={item} />)}
+                        : activeData.map((item, idx) => {
+                            const key = quickKeyOf(item);
+                            return (
+                                <ShipCard key={idx} item={item}
+                                    method={quick[key]?.method}
+                                    editing={methodEditKey === key}
+                                    onEdit={() => toggleMethodEdit(item)}
+                                    onPick={(m) => pickMethod(item, m)} />
+                            );
+                        })}
                 </div>
             )}
 
@@ -127,9 +156,10 @@ export function DashView({
                                     {sortTh("KCE 입고", "7%", null, "#1e40af")}
                                     {sortTh("예상재고", "8%")}
                                     {sortTh("상태", "7%")}
-                                    <th style={{ ...thStyle, width: "10%" }}>의뢰번호</th>
+                                    <th style={{ ...thStyle, width: "9%" }}>의뢰번호</th>
                                     <th style={{ ...thStyle, width: "5%" }}>담당</th>
-                                    <th style={{ ...thStyle, width: "10%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
+                                    <th style={{ ...thStyle, width: "9%" }}>출하방법</th>
+                                    <th style={{ ...thStyle, width: "9%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
                                 </>)}
                                 {mainTab === "prod" && (<>
                                     <th style={{ ...thStyle, width: "15%" }}>계획일자</th>
@@ -144,9 +174,16 @@ export function DashView({
                             </tr>
                         </thead>
                         <tbody>
-                            {mainTab.includes("ship") && activeData.map((item, idx) => (
-                                <ShipRow key={idx} item={item} />
-                            ))}
+                            {mainTab.includes("ship") && activeData.map((item, idx) => {
+                                const key = quickKeyOf(item);
+                                return (
+                                    <ShipRow key={idx} item={item}
+                                        method={quick[key]?.method}
+                                        editing={methodEditKey === key}
+                                        onEdit={() => toggleMethodEdit(item)}
+                                        onPick={(m) => pickMethod(item, m)} />
+                                );
+                            })}
 
                             {mainTab === "prod" && prodSummaryData.map((item, idx) => (
                                 <ProdAccordion key={idx} item={item} sortedProd={sortedProd}
@@ -163,7 +200,7 @@ export function DashView({
                             {((mainTab.includes("ship") && activeData.length === 0) ||
                                 (mainTab === "summary" && dailySummaryData.length === 0) ||
                                 (mainTab === "prod" && prodSummaryData.length === 0)) && (
-                                    <tr><td colSpan="12" style={{ padding: "2rem", textAlign: "center", color: "#64748b" }}>데이터가 없습니다.</td></tr>
+                                    <tr><td colSpan="13" style={{ padding: "2rem", textAlign: "center", color: "#64748b" }}>데이터가 없습니다.</td></tr>
                                 )}
                         </tbody>
                     </table>
@@ -200,9 +237,9 @@ function EmptyMessage() {
     return <div style={{ textAlign: "center", padding: "3rem", color: "#94a3b8" }}>데이터가 없습니다.</div>;
 }
 
-function ShipRow({ item }) {
+function ShipRow({ item, method, editing, onEdit, onPick }) {
     return (
-        <tr style={tbodyTrStyle}>
+        <tr style={tbodyTrStyle} onDoubleClick={onEdit} title="더블클릭하여 출하방법 지정">
             <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{fmtD(item.납기일자)}</td>
             <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
@@ -219,6 +256,13 @@ function ShipRow({ item }) {
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{renderStatusBadge(item._status)}</td>
             <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "0.65rem", wordBreak: "break-all" }}>{item.출하의뢰번호}</td>
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
+            <td style={{ ...tdStyle }}>
+                {editing
+                    ? <MethodPicker onPick={onPick} />
+                    : method
+                        ? <MethodChip method={method} />
+                        : <span style={{ color: "#cbd5e1", fontSize: "0.7rem" }}>-</span>}
+            </td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
                 {item._note
                     ? <span style={{ color: item._noteType === "dup" ? "#dc2626" : item._noteType === "esone" ? "#eab308" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>

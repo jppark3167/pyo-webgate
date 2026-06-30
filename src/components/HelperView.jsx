@@ -1,31 +1,18 @@
 // HelperView.jsx: 출하 도우미 — 퀵 배송 출하의뢰 지정 + 주소/박스수 입력 및 조회
 import { useState } from "react";
-
-// 저장 식별자: 출하의뢰번호 우선, 없으면 거래처+품목번호+납기일자 (DashView 메모키와 동일 규칙)
-const quickKeyOf = (r) => r.출하의뢰번호 || `${r.거래처명}_${r.품목번호}_${r.납기일자}`;
-
-// 저장 값 = 주소/박스수 + 조회용 스냅샷 (출하 리스트가 바뀌어도 조회 가능하도록)
-const buildValue = (row, address, boxCount) => ({
-    address: (address || "").trim(),
-    boxCount: Number(boxCount) || 0,
-    거래처명: row.거래처명 || "",
-    품목명: row.품목명 || "",
-    규격: row.규격 || "",
-    수량: row.수량 ?? "",
-    납기일자: row.납기일자 || "",
-    담당자: row.담당자 || "",
-    출하의뢰번호: row.출하의뢰번호 || "",
-});
+import { quickKeyOf, buildQuickValue } from "../utils";
+import { MethodChip } from "./ShipMethod";
 
 const inputStyle = { fontSize: "0.8rem", padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: 6, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 const btn = (bg, color) => ({ background: bg, color, border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" });
 
 function QuickCard({ qkey, row, saved, onSave }) {
-    const isQuick = !!saved;
+    const isQuick = saved?.method === "퀵";
     const [addr, setAddr] = useState(saved?.address || "");
     const [box, setBox] = useState(saved?.boxCount ? String(saved.boxCount) : "");
 
-    const commit = () => onSave(qkey, buildValue(row, addr, box));
+    // 도우미에서의 지정은 항상 출하방법 = "퀵"
+    const commit = () => onSave(qkey, buildQuickValue(row, { method: "퀵", address: addr, boxCount: box }));
     const release = () => onSave(qkey, null);
 
     return (
@@ -45,9 +32,12 @@ function QuickCard({ qkey, row, saved, onSave }) {
                         납기 {row.납기일자 || "-"} · 수량 {row.수량 ?? "-"}{row.출하의뢰번호 ? ` · ${row.출하의뢰번호}` : ""}
                     </div>
                 </div>
-                {isQuick
-                    ? <button style={btn("#fee2e2", "#b91c1c")} onClick={release}>퀵 해제</button>
-                    : <button style={btn("#4472C4", "#fff")} onClick={commit}>퀵 지정</button>}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {!isQuick && saved?.method && <MethodChip method={saved.method} />}
+                    {isQuick
+                        ? <button style={btn("#fee2e2", "#b91c1c")} onClick={release}>퀵 해제</button>
+                        : <button style={btn("#4472C4", "#fff")} onClick={commit}>퀵 지정</button>}
+                </div>
             </div>
 
             {isQuick && (
@@ -91,7 +81,7 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
             (r.출하의뢰번호 || "").toLowerCase().includes(q))
         : ships;
 
-    const quickEntries = Object.entries(quick);
+    const quickEntries = Object.entries(quick).filter(([, v]) => v?.method === "퀵");
 
     const tabBtn = (key, label) => (
         <button onClick={() => setTab(key)} style={{
