@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { fmtD, quickKeyOf, buildQuickValue } from "../utils";
+import { fmtD, quickKeyOf, buildQuickValue, findKnownRecipient } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
 import { MethodChip, MethodPicker } from "./ShipMethod";
 import { ShipCard } from "./ShipCard";
@@ -25,7 +25,13 @@ export function DashView({
             if (method == null) onSaveQuick(key, null);
             else {
                 const ex = quick[key] || {};
-                onSaveQuick(key, buildQuickValue(item, { method, address: ex.address, boxCount: ex.boxCount, phone: ex.phone }));
+                let address = ex.address, phone = ex.phone;
+                // 퀵 지정 시 주소록에 있는 거래처면 자동 입력
+                if (method === "퀵" && !address) {
+                    const known = findKnownRecipient(item.거래처명);
+                    if (known) { address = known.address; if (!phone) phone = known.phone; }
+                }
+                onSaveQuick(key, buildQuickValue(item, { method, address, boxCount: ex.boxCount, phone }));
             }
         }
         setMethodEditKey(null);

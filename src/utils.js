@@ -127,6 +127,26 @@ export const SHIP_METHODS = [
 // 저장 식별자: 출하의뢰번호 우선, 없으면 거래처+품목번호+납기일자 (DashView 메모키와 동일 규칙)
 export const quickKeyOf = (r) => str(r.출하의뢰번호) || `${str(r.거래처명)}_${str(r.품목번호)}_${str(r.납기일자)}`;
 
+// 자주 쓰는 거래처 주소록 (하드코딩) — 거래처명 인식 시 주소/연락처 자동 입력
+export const KNOWN_RECIPIENTS = [
+    { name: "애니원", address: "서울특별시 용산구 효창원로69나길 13 101호(효창동, 성부빌딩)", phone: "02-2138-6291" },
+    { name: "티에스에스", address: "서울시 용산구 효창원로 64길 21 창미빌딩 1~2층 (효창동 5-427)", phone: "02-718-6291" },
+    { name: "세이프", address: "경기도 구리시 동구릉로 427 1층 (사노동)", phone: "1522-7759" },
+];
+
+// 거래처명 정규화: (주)/㈜/주식회사/공백 제거
+const normName = (s) => str(s).replace(/\(주\)|\(㈜\)|㈜|주식회사/g, "").replace(/\s+/g, "");
+
+// 거래처명으로 주소록 매칭 (부분 포함 허용)
+export function findKnownRecipient(name) {
+    const n = normName(name);
+    if (!n) return null;
+    return KNOWN_RECIPIENTS.find(r => {
+        const rn = normName(r.name);
+        return n.includes(rn) || rn.includes(n);
+    }) || null;
+}
+
 // 저장 값 = 출하방법 + 주소/박스수 + 조회용 스냅샷 (출하 리스트가 바뀌어도 조회 가능하도록)
 export function buildQuickValue(row, { method = "", address = "", boxCount = 0, phone = "" } = {}) {
     return {

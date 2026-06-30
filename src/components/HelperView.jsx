@@ -1,6 +1,6 @@
 // HelperView.jsx: 출하 도우미 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회
 import { useState } from "react";
-import { quickKeyOf, buildQuickValue, toDateStr } from "../utils";
+import { quickKeyOf, buildQuickValue, toDateStr, findKnownRecipient } from "../utils";
 import { MethodChip } from "./ShipMethod";
 
 // 보내는 사람 (고정값)
@@ -17,8 +17,9 @@ const btn = (bg, color) => ({ background: bg, color, border: "none", borderRadiu
 // ── 퀵 지정 카드 (출하의뢰 한 건) ──────────────────
 function QuickCard({ qkey, row, saved, onSave }) {
     const isQuick = saved?.method === "퀵";
-    const [addr, setAddr] = useState(saved?.address || "");
-    const [phone, setPhone] = useState(saved?.phone || "");
+    const known = findKnownRecipient(row.거래처명);   // 주소록에 있으면 자동 입력
+    const [addr, setAddr] = useState(saved?.address || known?.address || "");
+    const [phone, setPhone] = useState(saved?.phone || known?.phone || "");
     const [box, setBox] = useState(saved?.boxCount ? String(saved.boxCount) : "");
 
     // 도우미에서의 지정은 항상 출하방법 = "퀵"
@@ -74,8 +75,9 @@ const itemCell = { border: "1px solid #111", padding: "5px 10px", fontSize: 15, 
 
 function QuickLabel({ name, items }) {
     const labelId = "qlabel-" + name.replace(/[^a-zA-Z0-9가-힣]/g, "");
-    const address = items.find(i => i.address)?.address || "";
-    const phone = items.find(i => i.phone)?.phone || "";
+    const known = findKnownRecipient(name);   // 입력값이 없으면 주소록으로 보완
+    const address = items.find(i => i.address)?.address || known?.address || "";
+    const phone = items.find(i => i.phone)?.phone || known?.phone || "";
     const totalBox = items.reduce((s, i) => s + (Number(i.boxCount) || 0), 0);
     const method = items[0]?.method || "퀵";
     const today = toDateStr(new Date());
@@ -101,9 +103,15 @@ function QuickLabel({ name, items }) {
             </div>
 
             <div style={{ overflowX: "auto" }}>
-                <div id={labelId} style={{ position: "relative", border: "1.5px solid #111", background: "#fff", color: "#111", width: 720, height: 470, padding: 24, boxSizing: "border-box", fontFamily: "'Malgun Gothic',sans-serif" }}>
-                    {/* 보내는 사람 */}
-                    <div style={{ position: "absolute", top: 24, left: 24 }}>
+                <div id={labelId} style={{
+                    border: "1.5px solid #111", background: "#fff", color: "#111",
+                    width: 720, minHeight: 460, padding: 24, boxSizing: "border-box",
+                    fontFamily: "'Malgun Gothic',sans-serif",
+                    display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "auto 1fr",
+                    columnGap: 24, rowGap: 28,
+                }}>
+                    {/* 보내는 사람 (1행 좌) */}
+                    <div>
                         <span style={boxedLabel}>보내는 사람</span>
                         <span style={{ marginLeft: 14, fontSize: 13, fontWeight: 700 }}>{today}</span>
                         <div style={{ fontSize: 18, marginTop: 8 }}>{SENDER.lines[0]}</div>
@@ -113,29 +121,31 @@ function QuickLabel({ name, items }) {
                         <div style={{ fontSize: 13, marginTop: 4 }}>{SENDER.mobile}</div>
                     </div>
 
-                    {/* 품목 표 */}
-                    <table style={{ position: "absolute", top: 24, right: 24, borderCollapse: "collapse" }}>
-                        <tbody>
-                            {items.map((it, i) => (
-                                <tr key={i}>
-                                    <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{i + 1}</td>
-                                    <td style={{ ...itemCell, minWidth: 200 }}>{it.품목명 || "-"}</td>
-                                    <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{it.수량 ?? "-"}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-
-                    {/* 출하방법 + 박스수 */}
-                    <div style={{ position: "absolute", top: 195, left: 90, textAlign: "center" }}>
-                        <div style={{ fontSize: 38, fontWeight: 700 }}>{method}</div>
-                        <div style={{ fontSize: 32, fontWeight: 700, marginTop: 22 }}>{totalBox} Box</div>
+                    {/* 품목 표 (1행 우) */}
+                    <div style={{ justifySelf: "end" }}>
+                        <table style={{ borderCollapse: "collapse" }}>
+                            <tbody>
+                                {items.map((it, i) => (
+                                    <tr key={i}>
+                                        <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{i + 1}</td>
+                                        <td style={{ ...itemCell, whiteSpace: "normal", minWidth: 170, maxWidth: 240, wordBreak: "break-all" }}>{it.품목명 || "-"}</td>
+                                        <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{it.수량 ?? "-"}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
 
-                    {/* 받는 사람 */}
-                    <div style={{ position: "absolute", top: 290, right: 24, left: 300, textAlign: "left" }}>
+                    {/* 출하방법 + 박스수 (2행 좌, 세로 중앙) */}
+                    <div style={{ alignSelf: "center", textAlign: "center" }}>
+                        <div style={{ fontSize: 38, fontWeight: 700 }}>{method}</div>
+                        <div style={{ fontSize: 32, fontWeight: 700, marginTop: 18 }}>{totalBox} Box</div>
+                    </div>
+
+                    {/* 받는 사람 (2행 우, 하단 정렬) */}
+                    <div style={{ alignSelf: "end" }}>
                         <span style={boxedLabel}>받는사람</span>
-                        <div style={{ fontSize: 17, fontWeight: 700, marginTop: 10 }}>{address || "(주소 미입력)"}</div>
+                        <div style={{ fontSize: 17, fontWeight: 700, marginTop: 10, wordBreak: "keep-all" }}>{address || "(주소 미입력)"}</div>
                         <div style={{ fontSize: 22, fontWeight: 700, marginTop: 10 }}>{name}</div>
                         {phone && <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{phone}</div>}
                     </div>
