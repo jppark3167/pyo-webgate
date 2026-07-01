@@ -1,4 +1,4 @@
-// HelperView.jsx: 출하 도우미 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회
+// HelperView.jsx: 출하 업무 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회
 import { useState } from "react";
 import { quickKeyOf, buildQuickValue, toDateStr, findKnownRecipient } from "../utils";
 import { MethodChip } from "./ShipMethod";
@@ -34,17 +34,17 @@ function QuickCard({ qkey, row, saved, onSave }) {
             borderLeft: isQuick ? "4px solid #4472C4" : "1px solid #e2e8f0",
             borderRadius: 8, padding: "12px 14px", marginBottom: 8, boxShadow: "0 1px 2px rgba(0,0,0,.04)",
         }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: "#334155" }}>{row.거래처명 || "-"}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: "#334155", wordBreak: "keep-all" }}>{row.거래처명 || "-"}</div>
                     <div style={{ fontSize: "0.8rem", color: "#475569", marginTop: 2, wordBreak: "break-all" }}>
                         {row.품목명}{row.규격 ? ` · ${row.규격}` : ""}
                     </div>
-                    <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 2 }}>
+                    <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 2, wordBreak: "break-all" }}>
                         납기 {row.납기일자 || "-"} · 수량 {row.수량 ?? "-"}{row.출하의뢰번호 ? ` · ${row.출하의뢰번호}` : ""}
                     </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     {!isQuick && saved?.method && <MethodChip method={saved.method} />}
                     {isQuick
                         ? <button style={btn("#fee2e2", "#b91c1c")} onClick={release}>퀵 해제</button>
@@ -192,7 +192,7 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
     );
 
     return (
-        <div>
+        <div style={{ textAlign: "left" }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 {tabBtn("assign", "퀵 지정")}
                 {tabBtn("list", `퀵 조회 (${groupList.length})`)}

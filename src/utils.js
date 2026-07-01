@@ -4,8 +4,8 @@
 export const globalCss = `
   .swipe-menu { overflow-x: auto; -webkit-overflow-scrolling: touch; -ms-overflow-style: none; scrollbar-width: none; }
   .swipe-menu::-webkit-scrollbar { display: none; }
-  .home-card { transition: transform .12s ease, box-shadow .12s ease; }
-  .home-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(30,58,95,.28); }
+  .home-card { transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
+  .home-card:hover { transform: translateY(-4px); box-shadow: 0 12px 26px rgba(30,58,95,.14); }
   @media (max-width: 640px) {
     .header-title { font-size: 14px !important; }
     .header-btn { font-size: 11px !important; padding: 5px 10px !important; }
