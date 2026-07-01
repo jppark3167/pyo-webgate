@@ -14,6 +14,9 @@ const SENDER = {
 const inputStyle = { fontSize: "0.8rem", padding: "6px 8px", border: "1px solid #cbd5e1", borderRadius: 6, outline: "none", boxSizing: "border-box", fontFamily: "inherit" };
 const btn = (bg, color) => ({ background: bg, color, border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap" });
 
+// 자주 퀵으로 나가는 고정 거래처 — 버튼 한 번으로 해당 거래처 출하의뢰를 모두 퀵 지정
+const QUICK_CUSTOMERS = ["애니원", "티에스에스", "세이프"];
+
 // ── 퀵 지정 카드 (출하의뢰 한 건) ──────────────────
 function QuickCard({ qkey, row, saved, onSave }) {
     const isQuick = saved?.method === "퀵";
@@ -164,6 +167,25 @@ function Empty({ text }) {
 export function HelperView({ ships = [], quick = {}, onSave }) {
     const [tab, setTab] = useState("assign");
     const [search, setSearch] = useState("");
+    const [flash, setFlash] = useState("");
+
+    // 특정 거래처의 출하의뢰 전부를 퀵으로 일괄 지정 (기존 주소·박스수는 보존, 없으면 주소록 자동 입력)
+    const matchCustomer = (name) => ships.filter(r => findKnownRecipient(r.거래처명)?.name === name);
+    const assignCustomer = (name) => {
+        const known = findKnownRecipient(name);
+        const matches = matchCustomer(name);
+        matches.forEach(row => {
+            const ex = quick[quickKeyOf(row)] || {};
+            onSave(quickKeyOf(row), buildQuickValue(row, {
+                method: "퀵",
+                address: ex.address || known?.address || "",
+                phone: ex.phone || known?.phone || "",
+                boxCount: ex.boxCount || 0,
+            }));
+        });
+        setFlash(matches.length ? `${name} ${matches.length}건 퀵 지정 완료` : `${name} 출하의뢰가 없습니다`);
+        setTimeout(() => setFlash(""), 2500);
+    };
 
     const q = search.trim().toLowerCase();
     const filtered = q
@@ -193,10 +215,30 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
 
     return (
         <div style={{ textAlign: "left" }}>
-            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
                 {tabBtn("assign", "퀵 지정")}
                 {tabBtn("list", `퀵 조회 (${groupList.length})`)}
+                <span style={{ width: 1, height: 22, background: "#e2e8f0", margin: "0 2px" }} />
+                <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600 }}>빠른 퀵 지정</span>
+                {QUICK_CUSTOMERS.map(name => {
+                    const cnt = matchCustomer(name).length;
+                    return (
+                        <button key={name} onClick={() => assignCustomer(name)} disabled={cnt === 0}
+                            title={cnt === 0 ? "해당 거래처 출하의뢰 없음" : `${name} ${cnt}건을 모두 퀵으로 지정`}
+                            style={{
+                                display: "inline-flex", alignItems: "center", gap: 5,
+                                background: cnt === 0 ? "#f1f5f9" : "#e5f5fc",
+                                color: cnt === 0 ? "#cbd5e1" : "#0b7bad",
+                                border: "1px solid " + (cnt === 0 ? "#e2e8f0" : "#b6e3f7"),
+                                borderRadius: 999, padding: "6px 12px", cursor: cnt === 0 ? "default" : "pointer",
+                                fontSize: "0.78rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap",
+                            }}>
+                            ⚡ {name}{cnt > 0 && <span style={{ fontWeight: 600, opacity: 0.8 }}>· {cnt}</span>}
+                        </button>
+                    );
+                })}
             </div>
+            {flash && <div style={{ fontSize: "0.8rem", color: "#0b7bad", background: "#e5f5fc", border: "1px solid #b6e3f7", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontWeight: 600 }}>✓ {flash}</div>}
 
             {tab === "assign" ? (
                 <>
