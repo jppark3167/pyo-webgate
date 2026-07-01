@@ -253,6 +253,7 @@ export default function App() {
   const shipEnriched = useMemo(() => {
     const sumQty = arr => arr.reduce((s, a) => s + (a.qty || 0), 0);
     const uniqDates = arr => [...new Set(arr.map(a => a.date).filter(Boolean))].sort();
+    const todayStr = toDateStr(new Date());
 
     // 1단계: 운반비/기타 제외 + 품목별 정적 정보(현재고·입고일정) 계산
     const rows = shipData.map(r => {
@@ -310,8 +311,11 @@ export default function App() {
         const inTime = a => !due || a.date <= due;     // 납기일까지 들어오면 가용
         const late = a => due && a.date > due;          // 납기일보다 늦게 들어옴
 
-        const prodInTime = prodArr.filter(inTime);
-        const prodLate = prodArr.filter(late);
+        // 오늘 이전 생산계획 = 이미 생산 완료분 → 생산예정에 합산하지 않고 비고에 "mm/dd 생산"으로 표시
+        const prodDone = prodArr.filter(a => a.date && a.date < todayStr);
+        const prodPending = prodArr.filter(a => !a.date || a.date >= todayStr);
+        const prodInTime = prodPending.filter(inTime);
+        const prodLate = prodPending.filter(late);
         const kceInTime = kceArr.filter(inTime);
         const kceLate = kceArr.filter(late);
 
@@ -325,6 +329,9 @@ export default function App() {
         r._incomingProdLate = sumQty(prodLate);
         r._prodDates = uniqDates(prodInTime);
         r._prodLateDates = uniqDates(prodLate);
+        r._prodDoneNote = prodDone.length > 0
+          ? uniqDates(prodDone).map(d => d.slice(5).replace("-", "/")).join(", ") + " 생산"
+          : null;
         r._kceIncoming = kceInTimeSum;
         r._kceIncomingLate = sumQty(kceLate);
         r._kceDates = uniqDates(kceInTime);
@@ -356,7 +363,7 @@ export default function App() {
       .map(r => r._skip ? {
         ...r, _currentInvQty: null, _incomingProd: 0, _incomingProdLate: 0, _prodDates: [], _prodLateDates: [],
         _kceIncoming: 0, _kceIncomingLate: 0, _kceDates: [], _kceLateDates: [], _projectedInvQty: null,
-        _status: "skip", _note: null, _noteType: null,
+        _status: "skip", _note: null, _noteType: null, _prodDoneNote: null,
       } : r)
       .filter(item => item._status !== "skip")
       .sort(byDueDate);
