@@ -108,6 +108,7 @@ export function DashView({
                         <option value="KCE 입고">KCE입고</option>
                         <option value="예상재고">예상재고</option>
                         <option value="상태">상태</option>
+                        <option value="의뢰번호">의뢰번호</option>
                     </select>
                     <button onClick={() => onShipSort(shipSort.key)}
                         style={{ padding: "0.4rem 0.5rem", fontSize: "0.8125rem", background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: "6px", cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -162,7 +163,7 @@ export function DashView({
                                     {sortTh("KCE 입고", "7%", null, "#1e40af")}
                                     {sortTh("예상재고", "8%")}
                                     {sortTh("상태", "7%")}
-                                    <th style={{ ...thStyle, width: "9%" }}>의뢰번호</th>
+                                    {sortTh("의뢰번호", "9%")}
                                     <th style={{ ...thStyle, width: "5%" }}>담당</th>
                                     <th style={{ ...thStyle, width: "9%" }}>출하방법</th>
                                     <th style={{ ...thStyle, width: "9%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>

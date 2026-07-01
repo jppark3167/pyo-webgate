@@ -26,6 +26,7 @@ const SHIP_SORT = {
   "KCE 입고": { field: "_kceIncoming", type: "num", dir: "asc" },
   "예상재고": { field: "_projectedInvQty", type: "num", dir: "asc" },
   "상태": { field: "_status", type: "status", dir: "asc" },        // 재고부족 먼저
+  "의뢰번호": { field: "출하의뢰번호", type: "reqnum", dir: "asc" }, // YYYYMMDD+000+순번
 };
 const STATUS_RANK = { shortage: 0, ok: 1 };
 
@@ -39,6 +40,15 @@ function shipComparator(key, dir) {
       if (!da) return 1;          // 날짜 없는 건 방향과 무관하게 항상 뒤로
       if (!db) return -1;
       return sign * da.localeCompare(db);
+    }
+    if (cfg.type === "reqnum") {
+      // 숫자만 추출해 비교 (자릿수가 달라도 올바른 순번 정렬). 빈 값은 항상 뒤로
+      const ra = str(a[cfg.field]).replace(/\D/g, ""), rb = str(b[cfg.field]).replace(/\D/g, "");
+      if (!ra && !rb) return 0;
+      if (!ra) return 1;
+      if (!rb) return -1;
+      if (ra.length !== rb.length) return sign * (ra.length - rb.length);
+      return sign * ra.localeCompare(rb);
     }
     if (cfg.type === "num") return sign * ((Number(a[cfg.field]) || 0) - (Number(b[cfg.field]) || 0));
     if (cfg.type === "status") return sign * ((STATUS_RANK[a[cfg.field]] ?? 9) - (STATUS_RANK[b[cfg.field]] ?? 9));

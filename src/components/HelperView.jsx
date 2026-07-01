@@ -110,8 +110,8 @@ function QuickLabel({ name, items }) {
                     display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "auto 1fr",
                     columnGap: 24, rowGap: 28,
                 }}>
-                    {/* 보내는 사람 (1행 좌) */}
-                    <div>
+                    {/* 보내는 사람 (1행 좌, 좌측 정렬) */}
+                    <div style={{ textAlign: "left" }}>
                         <span style={boxedLabel}>보내는 사람</span>
                         <span style={{ marginLeft: 14, fontSize: 13, fontWeight: 700 }}>{today}</span>
                         <div style={{ fontSize: 18, marginTop: 8 }}>{SENDER.lines[0]}</div>
@@ -136,14 +136,16 @@ function QuickLabel({ name, items }) {
                         </table>
                     </div>
 
-                    {/* 출하방법 + 박스수 (2행 좌, 세로 중앙) */}
+                    {/* 출하방법 + 박스수 (2행 좌, 세로 중앙) — 박스수는 공란으로 두고 수기 기입 */}
                     <div style={{ alignSelf: "center", textAlign: "center" }}>
                         <div style={{ fontSize: 38, fontWeight: 700 }}>{method}</div>
-                        <div style={{ fontSize: 32, fontWeight: 700, marginTop: 18 }}>{totalBox} Box</div>
+                        <div style={{ fontSize: 32, fontWeight: 700, marginTop: 18 }}>
+                            {totalBox > 0 ? `${totalBox} ` : "    "}Box
+                        </div>
                     </div>
 
-                    {/* 받는 사람 (2행 우, 하단 정렬) */}
-                    <div style={{ alignSelf: "end" }}>
+                    {/* 받는 사람 (2행 우, 하단·좌측 정렬) */}
+                    <div style={{ alignSelf: "end", textAlign: "left" }}>
                         <span style={boxedLabel}>받는사람</span>
                         <div style={{ fontSize: 17, fontWeight: 700, marginTop: 10, wordBreak: "keep-all" }}>{address || "(주소 미입력)"}</div>
                         <div style={{ fontSize: 22, fontWeight: 700, marginTop: 10 }}>{name}</div>
