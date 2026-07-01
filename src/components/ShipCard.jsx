@@ -1,6 +1,6 @@
 import { fmtD } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
-import { MethodChip, MethodPicker } from "./ShipMethod";
+import { MethodCycleChip } from "./ShipMethod";
 
 const statusColors = {
     ok: { bg: "#f0fdf4", border: "#86efac" },
@@ -9,11 +9,11 @@ const statusColors = {
     skip: { bg: "#f8fafc", border: "#e2e8f0" },
 };
 
-export function ShipCard({ item, method, editing, onEdit, onPick }) {
+export function ShipCard({ item, method, onCycle }) {
     const { bg, border } = statusColors[item._status] || statusColors.skip;
 
     return (
-        <div onDoubleClick={onEdit} title="더블탭하여 출하방법 지정" style={{
+        <div style={{
             background: bg, border: `1px solid ${border}`,
             borderRadius: "10px", padding: "0.875rem",
             marginBottom: "0.625rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)"
@@ -26,7 +26,7 @@ export function ShipCard({ item, method, editing, onEdit, onPick }) {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.375rem" }}>
                 <span style={{ fontWeight: "700", fontSize: "0.9rem", color: "#1e3a5f", display: "flex", alignItems: "center", gap: "0.375rem", flexWrap: "wrap" }}>
                     {item.거래처명}
-                    {method && <MethodChip method={method} />}
+                    <MethodCycleChip method={method} onCycle={onCycle} size="md" />
                 </span>
                 <span style={{ fontSize: "0.75rem", color: "#64748b", marginLeft: "0.5rem", whiteSpace: "nowrap" }}>{item.담당자}</span>
             </div>
@@ -61,12 +61,6 @@ export function ShipCard({ item, method, editing, onEdit, onPick }) {
                     {item._prodDoneNote && <span style={{ fontSize: "0.7rem", color: "#2563eb", fontWeight: "600" }}>{item._prodDoneNote}</span>}
                 </div>
             </div>
-
-            {editing && (
-                <div style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "1px dashed #cbd5e1" }}>
-                    <MethodPicker onPick={onPick} />
-                </div>
-            )}
         </div>
     );
 }

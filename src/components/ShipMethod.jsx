@@ -13,19 +13,25 @@ export function MethodChip({ method, size = "sm" }) {
     );
 }
 
-// onPick(method) — method가 null이면 지정 해제
-export function MethodPicker({ onPick }) {
-    const btn = (bg, color, label, key) => (
-        <button
-            key={label}
-            onClick={(e) => { e.stopPropagation(); onPick(key); }}
-            style={{ background: bg, color, border: "none", borderRadius: 4, padding: "3px 8px", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-        >{label}</button>
-    );
+// 클릭할 때마다 다음 출하방법으로 순환하는 칩 (미지정 → 퀵 → 택배 → 경동 → 직납 → 미지정)
+// onCycle() — 다음 방법으로 전환. 미지정 상태는 점선 "＋지정" 칩으로 표시
+export function MethodCycleChip({ method, onCycle, size = "sm" }) {
+    const m = SHIP_METHODS.find(x => x.key === method);
+    const handle = (e) => { e.stopPropagation(); onCycle(); };
+    const pad = size === "sm" ? "2px 7px" : "3px 9px";
+    const fs = size === "sm" ? "0.7rem" : "0.75rem";
+    if (!m) {
+        return (
+            <button onClick={handle} title="클릭하여 출하방법 지정 (누를 때마다 순환)"
+                style={{ background: "#f8fafc", color: "#94a3b8", border: "1px dashed #cbd5e1", borderRadius: 4, padding: pad, fontSize: fs, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>
+                ＋ 지정
+            </button>
+        );
+    }
     return (
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center", justifyContent: "center" }}>
-            {SHIP_METHODS.map(m => btn(m.bg, m.color, m.key, m.key))}
-            {btn("#f1f5f9", "#64748b", "해제", null)}
-        </div>
+        <button onClick={handle} title="클릭하여 다음 출하방법으로 변경"
+            style={{ background: m.bg, color: m.color, border: "none", borderRadius: 4, padding: pad, fontSize: fs, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: 3 }}>
+            {m.key}<span style={{ opacity: 0.55, fontSize: "0.85em" }}>↻</span>
+        </button>
     );
 }

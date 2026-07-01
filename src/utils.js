@@ -124,6 +124,13 @@ export const SHIP_METHODS = [
     { key: "직납", bg: "#f1f5f9", color: "#94a3b8" },   // 연하게 표시
 ];
 
+// 출하방법 순환: 미지정 → 퀵 → 택배 → 경동 → 직납 → 미지정 (칩 클릭 시 다음 값)
+export const nextShipMethod = (current) => {
+    const cycle = [...SHIP_METHODS.map(m => m.key), null];
+    const idx = cycle.indexOf(current ?? null);
+    return cycle[(idx + 1) % cycle.length];
+};
+
 // 저장 식별자: 출하의뢰번호 우선, 없으면 거래처+품목번호+납기일자 (DashView 메모키와 동일 규칙)
 export const quickKeyOf = (r) => str(r.출하의뢰번호) || `${str(r.거래처명)}_${str(r.품목번호)}_${str(r.납기일자)}`;
 

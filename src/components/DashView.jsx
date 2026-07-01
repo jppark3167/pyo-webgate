@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { fmtD, quickKeyOf, buildQuickValue, findKnownRecipient } from "../utils";
+import { fmtD, quickKeyOf, buildQuickValue, findKnownRecipient, nextShipMethod } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
-import { MethodChip, MethodPicker } from "./ShipMethod";
+import { MethodCycleChip } from "./ShipMethod";
 import { ShipCard } from "./ShipCard";
 import { useIsMobile } from "./useIsMobile";
 import { tabStyle, activeTabStyle, tableStyle, theadTrStyle, theadStyle, thStyle, tbodyTrStyle, tdStyle } from "./styles";
@@ -16,30 +16,23 @@ export function DashView({
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedProdDate, setSelectedProdDate] = useState(null);
     const [editingKey, setEditingKey] = useState(null);
-    const [methodEditKey, setMethodEditKey] = useState(null);
 
     // 출하방법 지정/해제 — 기존 주소·박스수는 보존, 해제 시 항목 삭제
     const pickMethod = (item, method) => {
         const key = quickKeyOf(item);
-        if (onSaveQuick) {
-            if (method == null) onSaveQuick(key, null);
-            else {
-                const ex = quick[key] || {};
-                let address = ex.address, phone = ex.phone;
-                // 퀵 지정 시 주소록에 있는 거래처면 자동 입력
-                if (method === "퀵" && !address) {
-                    const known = findKnownRecipient(item.거래처명);
-                    if (known) { address = known.address; if (!phone) phone = known.phone; }
-                }
-                onSaveQuick(key, buildQuickValue(item, { method, address, boxCount: ex.boxCount, phone }));
-            }
+        if (!onSaveQuick) return;
+        if (method == null) { onSaveQuick(key, null); return; }
+        const ex = quick[key] || {};
+        let address = ex.address, phone = ex.phone;
+        // 퀵 지정 시 주소록에 있는 거래처면 자동 입력
+        if (method === "퀵" && !address) {
+            const known = findKnownRecipient(item.거래처명);
+            if (known) { address = known.address; if (!phone) phone = known.phone; }
         }
-        setMethodEditKey(null);
+        onSaveQuick(key, buildQuickValue(item, { method, address, boxCount: ex.boxCount, phone }));
     };
-    const toggleMethodEdit = (item) => {
-        const key = quickKeyOf(item);
-        setMethodEditKey(prev => prev === key ? null : key);
-    };
+    // 칩 클릭 시 다음 출하방법으로 순환
+    const cycleMethod = (item) => pickMethod(item, nextShipMethod(quick[quickKeyOf(item)]?.method));
 
     const [memos, setMemos] = useState(() => {
         if (initialMemos) return initialMemos;
@@ -127,9 +120,7 @@ export function DashView({
                             return (
                                 <ShipCard key={idx} item={item}
                                     method={quick[key]?.method}
-                                    editing={methodEditKey === key}
-                                    onEdit={() => toggleMethodEdit(item)}
-                                    onPick={(m) => pickMethod(item, m)} />
+                                    onCycle={() => cycleMethod(item)} />
                             );
                         })}
                 </div>
@@ -186,9 +177,7 @@ export function DashView({
                                 return (
                                     <ShipRow key={idx} item={item}
                                         method={quick[key]?.method}
-                                        editing={methodEditKey === key}
-                                        onEdit={() => toggleMethodEdit(item)}
-                                        onPick={(m) => pickMethod(item, m)} />
+                                        onCycle={() => cycleMethod(item)} />
                                 );
                             })}
 
@@ -244,9 +233,9 @@ function EmptyMessage() {
     return <div style={{ textAlign: "center", padding: "3rem", color: "#94a3b8" }}>데이터가 없습니다.</div>;
 }
 
-function ShipRow({ item, method, editing, onEdit, onPick }) {
+function ShipRow({ item, method, onCycle }) {
     return (
-        <tr style={tbodyTrStyle} onDoubleClick={onEdit} title="더블클릭하여 출하방법 지정">
+        <tr style={tbodyTrStyle}>
             <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{fmtD(item.납기일자)}</td>
             <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
@@ -264,11 +253,7 @@ function ShipRow({ item, method, editing, onEdit, onPick }) {
             <td style={{ ...tdStyle, color: "#94a3b8", fontSize: "0.65rem", wordBreak: "break-all" }}>{item.출하의뢰번호}</td>
             <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자}</td>
             <td style={{ ...tdStyle }}>
-                {editing
-                    ? <MethodPicker onPick={onPick} />
-                    : method
-                        ? <MethodChip method={method} />
-                        : <span style={{ color: "#cbd5e1", fontSize: "0.7rem" }}>-</span>}
+                <MethodCycleChip method={method} onCycle={onCycle} />
             </td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
                 {item._note && <span style={{ color: item._noteType === "dup" ? "#dc2626" : item._noteType === "esone" ? "#eab308" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>}
