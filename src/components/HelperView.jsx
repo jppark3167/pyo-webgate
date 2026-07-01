@@ -87,7 +87,7 @@ function QuickLabel({ name, items }) {
         if (!el) return;
         const w = window.open("", "_blank", "width=960,height=680");
         if (!w) return;
-        w.document.write(`<html><head><title>배송 라벨 - ${name}</title></head><body style="margin:0;padding:16px;font-family:'Malgun Gothic',sans-serif;">${el.outerHTML}</body></html>`);
+        w.document.write(`<html><head><title>배송 라벨 - ${name}</title><style>@page { size: landscape; margin: 10mm; }</style></head><body style="margin:0;padding:16px;font-family:'Malgun Gothic',sans-serif;">${el.outerHTML}</body></html>`);
         w.document.close();
         w.focus();
         setTimeout(() => { w.print(); }, 200);
@@ -121,8 +121,8 @@ function QuickLabel({ name, items }) {
                         <div style={{ fontSize: 13, marginTop: 4 }}>{SENDER.mobile}</div>
                     </div>
 
-                    {/* 품목 표 (1행 우) */}
-                    <div style={{ justifySelf: "end" }}>
+                    {/* 품목 표 (1행 우, 받는사람과 좌측 시작점 일치) */}
+                    <div style={{ justifySelf: "start" }}>
                         <table style={{ borderCollapse: "collapse" }}>
                             <tbody>
                                 {items.map((it, i) => (
