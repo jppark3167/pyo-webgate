@@ -1,6 +1,6 @@
 // HelperView.jsx: 출하 업무 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회 + 재고 검색
 import { useState } from "react";
-import { quickKeyOf, buildQuickValue, toDateStr, findKnownRecipient } from "../utils";
+import { quickKeyOf, buildQuickValue, toDateStr, normDate, findKnownRecipient } from "../utils";
 import { MethodChip } from "./ShipMethod";
 import { renderStatusBadge } from "./StatusBadge";
 import { tableStyle, theadTrStyle, theadStyle, thStyle, tbodyTrStyle, tdStyle } from "./styles";
@@ -290,8 +290,12 @@ export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
         setManualForm(f => ({ ...f, product: "", qty: "" }));
     };
 
+    // 퀵 지정은 당일 납기(출하) 건만 대상으로 함
+    const todayStr = toDateStr(new Date());
+    const todaysShips = ships.filter(r => normDate(r.납기일자) === todayStr);
+
     // 특정 거래처의 출하의뢰 전부를 퀵으로 일괄 지정 (기존 주소·박스수는 보존, 없으면 주소록 자동 입력)
-    const matchCustomer = (name) => ships.filter(r => findKnownRecipient(r.거래처명)?.name === name);
+    const matchCustomer = (name) => todaysShips.filter(r => findKnownRecipient(r.거래처명)?.name === name);
     const assignCustomer = (name) => {
         const known = findKnownRecipient(name);
         const matches = matchCustomer(name);
@@ -310,11 +314,11 @@ export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
 
     const q = search.trim().toLowerCase();
     const filtered = q
-        ? ships.filter(r =>
+        ? todaysShips.filter(r =>
             (r.거래처명 || "").toLowerCase().includes(q) ||
             (r.품목명 || "").toLowerCase().includes(q) ||
             (r.출하의뢰번호 || "").toLowerCase().includes(q))
-        : ships;
+        : todaysShips;
 
     const quickEntries = Object.entries(quick).filter(([, v]) => v?.method === "퀵");
 
@@ -390,13 +394,20 @@ export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
                 <InvSearch invItems={invItems} />
             ) : tab === "assign" ? (
                 <>
+                    <div style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, marginBottom: 8 }}>
+                        오늘({todayStr}) 납기 출하의뢰만 표시됩니다.
+                    </div>
                     <input
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         placeholder="거래처 · 품목 · 출하의뢰번호 검색"
                         style={{ ...inputStyle, width: "100%", padding: "9px 12px", marginBottom: 12 }} />
                     {filtered.length === 0
-                        ? <Empty text={ships.length === 0 ? "출하의뢰 데이터가 없습니다. 먼저 출하의뢰를 업로드하세요." : "검색 결과가 없습니다."} />
+                        ? <Empty text={
+                            ships.length === 0 ? "출하의뢰 데이터가 없습니다. 먼저 출하의뢰를 업로드하세요."
+                                : todaysShips.length === 0 ? "오늘 납기인 출하의뢰가 없습니다."
+                                    : "검색 결과가 없습니다."
+                        } />
                         : filtered.map((row, i) => {
                             const qkey = quickKeyOf(row);
                             return <QuickCard key={`${qkey}_${i}`} qkey={qkey} row={row} saved={quick[qkey]} onSave={onSave} />;
