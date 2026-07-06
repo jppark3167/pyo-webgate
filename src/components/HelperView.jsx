@@ -76,7 +76,11 @@ function QuickCard({ qkey, row, saved, onSave }) {
 const boxedLabel = { display: "inline-block", border: "1.5px solid #111", padding: "4px 12px", fontWeight: 700, fontSize: 15 };
 const itemCell = { border: "1px solid #111", padding: "5px 10px", fontSize: 15, whiteSpace: "nowrap" };
 
-function QuickLabel({ name, items }) {
+// 인쇄 페이지(A4 가로) 규격 — 화면상 라벨(px)을 여백 없이 이 크기에 맞춰 확대
+const PAGE_W_MM = 297, PAGE_H_MM = 210;
+const PX_TO_MM = 25.4 / 96;
+
+function QuickLabel({ name, items, onRemove }) {
     const labelId = "qlabel-" + name.replace(/[^a-zA-Z0-9가-힣]/g, "");
     const known = findKnownRecipient(name);   // 입력값이 없으면 주소록으로 보완
     const address = items.find(i => i.address)?.address || known?.address || "";
@@ -90,7 +94,15 @@ function QuickLabel({ name, items }) {
         if (!el) return;
         const w = window.open("", "_blank", "width=960,height=680");
         if (!w) return;
-        w.document.write(`<html><head><title>배송 라벨 - ${name}</title><style>@page { size: landscape; margin: 10mm; }</style></head><body style="margin:0;padding:16px;font-family:'Malgun Gothic',sans-serif;">${el.outerHTML}</body></html>`);
+        // 라벨을 A4 가로 한 장에 여백 없이 꽉 차도록 비율 유지 확대
+        const scale = Math.min(PAGE_W_MM / (el.offsetWidth * PX_TO_MM), PAGE_H_MM / (el.offsetHeight * PX_TO_MM));
+        w.document.write(`<html><head><title>배송 라벨 - ${name}</title><style>
+            @page { size: landscape; margin: 0; }
+            html, body { margin: 0; padding: 0; }
+            .no-print{ display: none !important; }
+            .print-page { width: ${PAGE_W_MM}mm; height: ${PAGE_H_MM}mm; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+            .print-scale { transform: scale(${scale}); }
+        </style></head><body><div class="print-page"><div class="print-scale">${el.outerHTML}</div></div></body></html>`);
         w.document.close();
         w.focus();
         setTimeout(() => { w.print(); }, 200);
@@ -129,10 +141,16 @@ function QuickLabel({ name, items }) {
                         <table style={{ borderCollapse: "collapse" }}>
                             <tbody>
                                 {items.map((it, i) => (
-                                    <tr key={i}>
+                                    <tr key={it._key || i}>
                                         <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{i + 1}</td>
                                         <td style={{ ...itemCell, whiteSpace: "normal", minWidth: 170, maxWidth: 240, wordBreak: "break-all" }}>{it.품목명 || "-"}</td>
                                         <td style={{ ...itemCell, textAlign: "center", fontWeight: 700 }}>{it.수량 ?? "-"}</td>
+                                        <td className="no-print" style={{ border: "none", padding: "0 0 0 4px", width: 20 }}>
+                                            {it._manual && (
+                                                <button className="no-print" onClick={() => onRemove?.(it._key)} title="수동 항목 삭제"
+                                                    style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 14, fontWeight: 700, lineHeight: 1, padding: 0 }}>×</button>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -168,6 +186,18 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
     const [tab, setTab] = useState("assign");
     const [search, setSearch] = useState("");
     const [flash, setFlash] = useState("");
+    const [manualForm, setManualForm] = useState({ name: "", product: "", qty: "" });
+
+    // 수동 추가 항목도 기존 퀵 지정과 동일하게 quick 저장소(서버)에 저장 — 새로고침 후에도 유지됨
+    const addManualItem = () => {
+        const name = manualForm.name.trim();
+        const product = manualForm.product.trim();
+        const qty = manualForm.qty.trim();
+        if (!name || !product || !qty) return;
+        const key = `manual_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        onSave(key, { method: "퀵", 거래처명: name, 품목명: product, 수량: qty, _manual: true });
+        setManualForm(f => ({ ...f, product: "", qty: "" }));
+    };
 
     // 특정 거래처의 출하의뢰 전부를 퀵으로 일괄 지정 (기존 주소·박스수는 보존, 없으면 주소록 자동 입력)
     const matchCustomer = (name) => ships.filter(r => findKnownRecipient(r.거래처명)?.name === name);
@@ -197,11 +227,11 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
 
     const quickEntries = Object.entries(quick).filter(([, v]) => v?.method === "퀵");
 
-    // 거래처명으로 그룹화 (배송 라벨 단위)
+    // 거래처명으로 그룹화 (배송 라벨 단위) — key를 붙여둬 수동 항목 삭제(onSave(key, null))에 사용
     const groups = {};
-    quickEntries.forEach(([, v]) => {
+    quickEntries.forEach(([key, v]) => {
         const name = v.거래처명 || "(거래처 미지정)";
-        (groups[name] ||= []).push(v);
+        (groups[name] ||= []).push({ ...v, _key: key });
     });
     const groupList = Object.entries(groups);
 
@@ -255,11 +285,42 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
                         })}
                 </>
             ) : (
-                groupList.length === 0
-                    ? <Empty text="퀵으로 지정된 출하의뢰가 없습니다." />
-                    : groupList.map(([name, items]) => (
-                        <QuickLabel key={name} name={name} items={items} />
-                    ))
+                <>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: "10px 12px", marginBottom: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                        <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600, whiteSpace: "nowrap" }}>모델 수동 추가</span>
+                        <input
+                            value={manualForm.name}
+                            onChange={e => setManualForm(f => ({ ...f, name: e.target.value }))}
+                            list="quick-group-names"
+                            placeholder="거래처명"
+                            style={{ ...inputStyle, flex: "1 1 140px", minWidth: 0 }} />
+                        <datalist id="quick-group-names">
+                            {groupList.map(([name]) => <option key={name} value={name} />)}
+                        </datalist>
+                        <input
+                            value={manualForm.product}
+                            onChange={e => setManualForm(f => ({ ...f, product: e.target.value }))}
+                            placeholder="모델명"
+                            style={{ ...inputStyle, flex: "1 1 160px", minWidth: 0 }} />
+                        <input
+                            value={manualForm.qty}
+                            onChange={e => setManualForm(f => ({ ...f, qty: e.target.value.replace(/[^0-9]/g, "") }))}
+                            placeholder="수량"
+                            inputMode="numeric"
+                            style={{ ...inputStyle, width: 70, textAlign: "right" }} />
+                        <button
+                            style={btn("#4472C4", "#fff")}
+                            onClick={addManualItem}
+                            disabled={!manualForm.name.trim() || !manualForm.product.trim() || !manualForm.qty.trim()}>
+                            + 추가
+                        </button>
+                    </div>
+                    {groupList.length === 0
+                        ? <Empty text="퀵으로 지정된 출하의뢰가 없습니다." />
+                        : groupList.map(([name, items]) => (
+                            <QuickLabel key={name} name={name} items={items} onRemove={key => onSave(key, null)} />
+                        ))}
+                </>
             )}
         </div>
     );
