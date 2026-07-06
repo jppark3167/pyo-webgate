@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const { MongoClient } = require("mongodb");
 const crypto = require("crypto");
+const { fetchAndParseKceSheet } = require("./kceSync");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -12,6 +13,8 @@ const MONGODB_URI = process.env.MONGODB_URI;
 // 접속 비밀번호 (운영에서는 반드시 환경변수 APP_PASSWORD 로 설정)
 const APP_PASSWORD = process.env.APP_PASSWORD || "pyo-webgate";
 const AUTH_TOKEN = crypto.createHash("sha256").update(APP_PASSWORD).digest("hex");
+// 관리자 페이지(업로드 설정) 전용 별도 비밀번호 (운영에서는 반드시 환경변수 ADMIN_PASSWORD 로 설정)
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin1234";
 
 let db;
 
@@ -72,6 +75,15 @@ app.use("/api", (req, res, next) => {
 
 // ── API ───────────────────────────────────────
 
+// 관리자 페이지(업로드 설정) 진입용 비밀번호 확인 — 로그인과 별개의 2차 확인
+app.post("/api/admin/verify", (req, res) => {
+    const input = Buffer.from(String((req.body && req.body.password) || ""));
+    const expected = Buffer.from(ADMIN_PASSWORD);
+    const ok = input.length === expected.length && crypto.timingSafeEqual(input, expected);
+    if (!ok) return res.status(401).json({ error: "비밀번호가 올바르지 않습니다." });
+    res.json({ ok: true });
+});
+
 // 전체 데이터 조회
 app.get("/api/data", async (req, res) => {
     try {
@@ -106,6 +118,8 @@ app.get("/api/data", async (req, res) => {
             quick,
             prodFile: meta.prodFile || "",
             invFile: meta.invFile || "",
+            kceSheetUrl: meta.kceSheetUrl || "",
+            kceLastSync: meta.kceLastSync || "",
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -162,6 +176,26 @@ app.post("/api/kce", async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// KCE 입고일정 — 구글 시트(뷰어 공개) 즉시 동기화. sheetUrl 생략 시 마지막으로 저장된 URL 사용
+app.post("/api/kce/sync", async (req, res) => {
+    try {
+        const bodyUrl = (req.body && req.body.sheetUrl || "").trim();
+        const saved = await db.collection("meta").findOne({ _id: "kceSheetUrl" });
+        const sheetUrl = bodyUrl || (saved && saved.value) || "";
+        if (!sheetUrl) return res.status(400).json({ error: "구글 시트 URL이 설정되어 있지 않습니다." });
+
+        const parsed = await fetchAndParseKceSheet(sheetUrl);
+        await db.collection("kceData").deleteMany({});
+        if (parsed.length > 0) await db.collection("kceData").insertMany(parsed);
+
+        const syncedAt = new Date().toISOString();
+        await db.collection("meta").updateOne({ _id: "kceSheetUrl" }, { $set: { value: sheetUrl } }, { upsert: true });
+        await db.collection("meta").updateOne({ _id: "kceLastSync" }, { $set: { value: syncedAt } }, { upsert: true });
+
+        res.json({ ok: true, count: parsed.length, syncedAt, kceData: parsed });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // 메모 단건 저장/삭제
 app.patch("/api/memos", async (req, res) => {
     try {
@@ -215,11 +249,30 @@ if (fs.existsSync(BUILD_DIR)) {
     app.get("*", (req, res) => res.sendFile(path.join(BUILD_DIR, "index.html")));
 }
 
+// KCE 입고일정 자동 동기화 — 저장된 구글 시트 URL이 있을 때만 수행, 실패해도 서버는 계속 동작
+const KCE_SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1시간
+async function runAutoKceSync() {
+    try {
+        const saved = await db.collection("meta").findOne({ _id: "kceSheetUrl" });
+        const sheetUrl = saved && saved.value;
+        if (!sheetUrl) return;
+        const parsed = await fetchAndParseKceSheet(sheetUrl);
+        await db.collection("kceData").deleteMany({});
+        if (parsed.length > 0) await db.collection("kceData").insertMany(parsed);
+        await db.collection("meta").updateOne({ _id: "kceLastSync" }, { $set: { value: new Date().toISOString() } }, { upsert: true });
+        console.log(`✅ KCE 자동 동기화 완료 (${parsed.length}건)`);
+    } catch (e) {
+        console.error("⚠️ KCE 자동 동기화 실패:", e.message);
+    }
+}
+
 // 서버 시작
 connectDB().then(() => {
     app.listen(PORT, "0.0.0.0", () => {
         console.log(`✅ 서버 실행 중: http://localhost:${PORT}`);
     });
+    runAutoKceSync();
+    setInterval(runAutoKceSync, KCE_SYNC_INTERVAL_MS);
 }).catch(err => {
     console.error("❌ MongoDB 연결 실패:", err);
     process.exit(1);

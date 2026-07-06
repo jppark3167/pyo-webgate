@@ -3,6 +3,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { globalCss, str, num, findInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
 import { InputView, DashView, HomeView, HelperView } from "./components/index";
 import { Login } from "./components/Login";
+import { AdminGate } from "./components/AdminGate";
 import { processProdFile, processInvFile } from "./excelParser";
 import { api } from "./api";
 
@@ -70,6 +71,9 @@ export default function App() {
   const [view, setView] = useState("dash");
   const [shipText, setShipText] = useState("");
   const [kceText, setKceText] = useState("");
+  const [kceSheetUrl, setKceSheetUrl] = useState("");
+  const [kceLastSync, setKceLastSync] = useState("");
+  const [kceSyncing, setKceSyncing] = useState(false);
   const [parseMsg, setParseMsg] = useState(null);
   const [mainTab, setMainTab] = useState("ship_dom");
   const [search, setSearch] = useState("");
@@ -77,6 +81,8 @@ export default function App() {
   const [shipSort, setShipSort] = useState({ key: "납기일자", dir: "desc" });
   const [loading, setLoading] = useState(true);
   const [authed, setAuthed] = useState(api.isLoggedIn());
+  const [adminUnlocked, setAdminUnlocked] = useState(false);   // 관리자 페이지 2차 비밀번호 통과 여부 (새로고침 시 초기화)
+  const [showAdminGate, setShowAdminGate] = useState(false);
 
   // ── 로그인 후 서버에서 전체 데이터 로드 ──────
   useEffect(() => {
@@ -93,6 +99,8 @@ export default function App() {
         setQuick(db.quick || {});
         setProdFile(db.prodFile || "");
         setInvFile(db.invFile || "");
+        setKceSheetUrl(db.kceSheetUrl || "");
+        setKceLastSync(db.kceLastSync || "");
       })
       .catch((e) => {
         if (cancelled) return;
@@ -109,6 +117,7 @@ export default function App() {
     await api.resetAll();
     setProdData([]); setInvData([]); setShipData([]); setKceData([]); setMemos({}); setQuick({});
     setProdFile(""); setInvFile(""); setShipText(""); setKceText("");
+    setKceSheetUrl(""); setKceLastSync("");
     setParseMsg("✅ 모든 데이터가 초기화되었습니다.");
   };
 
@@ -220,6 +229,26 @@ export default function App() {
     } catch (e) {
       console.error(e);
       setParseMsg("❌ KCE 데이터 파싱 중 오류가 발생했습니다.");
+    }
+  };
+
+  // ── KCE 입고일정 — 구글 시트(뷰어 공개) 동기화 ─────────────
+  // 서버가 1시간마다 자동 동기화하지만, 버튼으로도 즉시 동기화 가능
+  const handleKceSync = async (urlOverride) => {
+    const url = (urlOverride ?? kceSheetUrl).trim();
+    if (!url) { setParseMsg("⚠️ 구글 시트 URL을 입력하세요"); return; }
+    setKceSyncing(true);
+    try {
+      const result = await api.syncKce(url);
+      setKceData(result.kceData || []);
+      setKceSheetUrl(url);
+      setKceLastSync(result.syncedAt || "");
+      setParseMsg(`✅ 구글 시트 동기화 완료 (${result.count}건)`);
+    } catch (e) {
+      console.error(e);
+      setParseMsg(`❌ 구글 시트 동기화 실패: ${e.message}`);
+    } finally {
+      setKceSyncing(false);
     }
   };
 
@@ -520,7 +549,7 @@ export default function App() {
       <style>{globalCss}</style>
       <HomeView
         onSelect={(key) => { setScreen(key); setView("dash"); setParseMsg(null); }}
-        onLogout={() => { api.logout(); setAuthed(false); }}
+        onLogout={() => { api.logout(); setAuthed(false); setAdminUnlocked(false); }}
       />
     </>
   );
@@ -547,15 +576,19 @@ export default function App() {
             {screen === "dashboard" && (
               <button
                 className="header-btn"
-                onClick={() => { setView(view === "input" ? "dash" : "input"); setParseMsg(null); }}
+                onClick={() => {
+                  if (view === "input") { setView("dash"); setParseMsg(null); return; }
+                  if (adminUnlocked) { setView("input"); setParseMsg(null); }
+                  else setShowAdminGate(true);
+                }}
                 style={{ background: "#ffffff22", color: "#fff", border: "1px solid #ffffff44", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
               >
-                {view === "input" ? "← 대시보드" : "📂 업로드 설정"}
+                {view === "input" ? "← 대시보드" : "🔐 관리자 페이지"}
               </button>
             )}
             <button
               className="header-btn"
-              onClick={() => { api.logout(); setAuthed(false); }}
+              onClick={() => { api.logout(); setAuthed(false); setAdminUnlocked(false); }}
               style={{ background: "transparent", color: "#cbd5e1", border: "1px solid #ffffff33", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
               로그아웃
@@ -583,6 +616,11 @@ export default function App() {
               setKceText={setKceText}
               handleKceParse={handleKceParse}
               kceData={kceData}
+              kceSheetUrl={kceSheetUrl}
+              setKceSheetUrl={setKceSheetUrl}
+              handleKceSync={handleKceSync}
+              kceSyncing={kceSyncing}
+              kceLastSync={kceLastSync}
             />
           ) : (
             <DashView
@@ -608,6 +646,12 @@ export default function App() {
           )}
         </div>
       </div>
+      {showAdminGate && (
+        <AdminGate
+          onSuccess={() => { setAdminUnlocked(true); setShowAdminGate(false); setView("input"); setParseMsg(null); }}
+          onCancel={() => setShowAdminGate(false)}
+        />
+      )}
     </>
   );
 }

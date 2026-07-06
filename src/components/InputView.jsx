@@ -3,7 +3,8 @@ export function InputView({
     handleProdFile, prodData, prodFile,
     handleInvFile, invData, invFile,
     shipText, setShipText, handleShipParse,
-    kceText, setKceText, handleKceParse, kceData
+    kceText, setKceText, handleKceParse, kceData,
+    kceSheetUrl, setKceSheetUrl, handleKceSync, kceSyncing, kceLastSync
 }) {
     return (
         <div style={{ padding: "1rem", maxWidth: "800px", margin: "0 auto" }}>
@@ -30,16 +31,45 @@ export function InputView({
                 {parseMsg && <p style={{ fontSize: "0.8125rem", color: parseMsg.includes("✅") ? "#166534" : "#b91c1c", marginTop: "0.75rem", fontWeight: "600" }}>{parseMsg}</p>}
             </Card>
 
-            <Card title="📥 KCE 입고일정 붙여넣기" last>
+            <Card title="🔗 KCE 입고일정 — 구글 시트 자동 동기화">
                 <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 0, marginBottom: "0.75rem" }}>
-                    품번 / 수량 / 발주일 / 입고예정일 / 미입고수 / 담당자 순서로 붙여넣으세요.<br />
+                    "링크가 있는 모든 사용자(뷰어)"로 공개된 구글 시트 링크를 등록하면 1시간마다 자동으로 최신 데이터를 가져옵니다. 필요할 때 아래 버튼으로 즉시 동기화할 수도 있습니다.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <input
+                        type="text"
+                        value={kceSheetUrl}
+                        onChange={e => setKceSheetUrl(e.target.value)}
+                        placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=..."
+                        style={{ flex: "1 1 260px", padding: "0.6rem 0.75rem", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "0.8125rem", boxSizing: "border-box", fontFamily: "inherit" }} />
+                    <button
+                        onClick={() => handleKceSync()}
+                        disabled={kceSyncing || !kceSheetUrl?.trim()}
+                        style={{
+                            background: kceSyncing ? "#94a3b8" : "#0f766e", color: "#fff", border: "none", borderRadius: "6px",
+                            padding: "0.6rem 1rem", fontSize: "0.8125rem", fontWeight: "600",
+                            cursor: kceSyncing || !kceSheetUrl?.trim() ? "default" : "pointer", whiteSpace: "nowrap",
+                        }}>
+                        {kceSyncing ? "동기화 중..." : "🔄 지금 동기화"}
+                    </button>
+                </div>
+                {kceLastSync && (
+                    <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.5rem", marginBottom: 0 }}>
+                        마지막 동기화: {new Date(kceLastSync).toLocaleString("ko-KR")}
+                    </p>
+                )}
+                {kceData?.length > 0 && (
+                    <Status text={`✅ KCE ${kceData.length}건 (${[...new Set(kceData.map(d => d.품번))].length}개 품번)`} />
+                )}
+            </Card>
+
+            <Card title="📥 KCE 입고일정 수동 붙여넣기" last>
+                <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 0, marginBottom: "0.75rem" }}>
+                    구글 시트 연동 대신 직접 붙여넣을 수도 있습니다. 품번 / 수량 / 발주일 / 입고예정일 / 미입고수 / 담당자 순서로 붙여넣으세요.<br />
                     입고예정일은 "136대 6/2 / 64대 7/3"처럼 여러 날짜를 적어도 자동 분리되며, 납기일보다 늦게 들어오는 물량은 가용재고로 잡지 않습니다.
                 </p>
                 <TextArea value={kceText} onChange={setKceText} placeholder="KCE 입고일정 데이터를 붙여넣으세요..." />
                 <SubmitButton onClick={handleKceParse} label="KCE 입고일정 적용" color="#0f766e" />
-                {kceData?.length > 0 && (
-                    <Status text={`✅ KCE ${kceData.length}건 (${[...new Set(kceData.map(d => d.품번))].length}개 품번)`} />
-                )}
             </Card>
         </div>
     );
