@@ -500,6 +500,19 @@ export default function App() {
     return da.localeCompare(db);
   }), [filteredProd]);
 
+  // ── KCE 입고일정 정렬 (가장 빠른 입고예정일 순, 날짜 미정은 뒤로) ──
+  const sortedKce = useMemo(() => {
+    const earliestDate = item => {
+      const dates = (item._schedule || []).map(s => s.date).filter(Boolean);
+      return dates.length ? [...dates].sort()[0] : "";
+    };
+    return [...kceData].sort((a, b) => {
+      const da = earliestDate(a), db = earliestDate(b);
+      if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+      return da.localeCompare(db);
+    });
+  }, [kceData]);
+
   // ── 요약 데이터 ────────────────────────────────
   const prodSummaryData = useMemo(() => {
     const map = {};
@@ -635,6 +648,7 @@ export default function App() {
               sortedShipDom={sortedShipDom}
               sortedShipOvs={sortedShipOvs}
               sortedProd={sortedProd}
+              sortedKce={sortedKce}
               prodSummaryData={prodSummaryData}
               dailySummaryData={dailySummaryData}
               allShipData={shipEnriched}

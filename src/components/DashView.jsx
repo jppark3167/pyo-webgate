@@ -8,7 +8,7 @@ import { tabStyle, activeTabStyle, tableStyle, theadTrStyle, theadStyle, thStyle
 
 export function DashView({
     mainTab, setMainTab, filterStatus, setFilterStatus, search, setSearch,
-    shipSort, onShipSort, sortedShipDom, sortedShipOvs, sortedProd, prodSummaryData = [],
+    shipSort, onShipSort, sortedShipDom, sortedShipOvs, sortedProd, sortedKce = [], prodSummaryData = [],
     dailySummaryData = [], allShipData = [], apiSaveMemo = null, initialMemos = null,
     quick = {}, onSaveQuick = null
 }) {
@@ -75,6 +75,7 @@ export function DashView({
                 <button style={mainTab === "ship_dom" ? activeTabStyle : tabStyle} onClick={() => setMainTab("ship_dom")}>🚚 국내</button>
                 <button style={mainTab === "ship_ovs" ? activeTabStyle : tabStyle} onClick={() => setMainTab("ship_ovs")}>✈️ 해외</button>
                 <button style={mainTab === "prod" ? activeTabStyle : tabStyle} onClick={() => setMainTab("prod")}>📋 생산</button>
+                <button style={mainTab === "kce" ? activeTabStyle : tabStyle} onClick={() => setMainTab("kce")}>📥 KCE</button>
                 <button style={mainTab === "summary" ? activeTabStyle : tabStyle} onClick={() => setMainTab("summary")}>📅 요약</button>
             </div>
 
@@ -138,6 +139,11 @@ export function DashView({
                     selectedProdDate={selectedProdDate} setSelectedProdDate={setSelectedProdDate} />
             )}
 
+            {/* 모바일: KCE 입고일정 카드 */}
+            {isMobile && mainTab === "kce" && (
+                <MobileKce data={sortedKce} />
+            )}
+
             {/* PC: 테이블 레이아웃 */}
             {!isMobile && (
                 <div className="swipe-menu" style={{ background: "#fff", borderRadius: "8px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", width: "100%", overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 200px)", WebkitOverflowScrolling: "touch" }}>
@@ -164,6 +170,15 @@ export function DashView({
                                     <th style={{ ...thStyle, width: "10%" }}>건수</th>
                                     <th style={{ ...thStyle, width: "15%" }}>총 수량</th>
                                 </>)}
+                                {mainTab === "kce" && (<>
+                                    <th style={{ ...thStyle, width: "18%", textAlign: "left", paddingLeft: "0.5rem" }}>품번</th>
+                                    <th style={{ ...thStyle, width: "10%" }}>발주수량</th>
+                                    <th style={{ ...thStyle, width: "10%" }}>발주일</th>
+                                    <th style={{ ...thStyle, width: "27%", textAlign: "left", paddingLeft: "0.5rem" }}>입고예정</th>
+                                    <th style={{ ...thStyle, width: "10%", color: "#b45309" }}>미입고수</th>
+                                    <th style={{ ...thStyle, width: "10%" }}>담당자</th>
+                                    <th style={{ ...thStyle, width: "15%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
+                                </>)}
                                 {mainTab === "summary" && (<>
                                     <th style={thStyle}>납기일자</th>
                                     <th style={thStyle}>출하 건수</th>
@@ -186,6 +201,10 @@ export function DashView({
                                     selectedProdDate={selectedProdDate} setSelectedProdDate={setSelectedProdDate} />
                             ))}
 
+                            {mainTab === "kce" && sortedKce.map((item, idx) => (
+                                <KceRow key={idx} item={item} />
+                            ))}
+
                             {mainTab === "summary" && dailySummaryData.map((item, idx) => (
                                 <SummaryAccordion key={idx} item={item} allShipData={allShipData}
                                     selectedDate={selectedDate} setSelectedDate={setSelectedDate}
@@ -195,7 +214,8 @@ export function DashView({
 
                             {((mainTab.includes("ship") && activeData.length === 0) ||
                                 (mainTab === "summary" && dailySummaryData.length === 0) ||
-                                (mainTab === "prod" && prodSummaryData.length === 0)) && (
+                                (mainTab === "prod" && prodSummaryData.length === 0) ||
+                                (mainTab === "kce" && sortedKce.length === 0)) && (
                                     <tr><td colSpan="13" style={{ padding: "2rem", textAlign: "center", color: "#64748b" }}>데이터가 없습니다.</td></tr>
                                 )}
                         </tbody>
@@ -261,6 +281,48 @@ function ShipRow({ item, method, onCycle }) {
                 {!item._note && !item._prodDoneNote && <span style={{ color: "#cbd5e1" }}>-</span>}
             </td>
         </tr>
+    );
+}
+
+function KceRow({ item }) {
+    const dates = (item._schedule || []).map(s => `${fmtD(s.date)}(${s.qty})`).join(", ");
+    return (
+        <tr style={tbodyTrStyle}>
+            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontWeight: "600", wordBreak: "break-all" }}>{item.품번}</td>
+            <td style={tdStyle}>{item.발주수량}</td>
+            <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{item.발주일 || "-"}</td>
+            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
+                {dates
+                    ? <div style={{ color: "#1e40af", fontWeight: "600" }}>{dates}</div>
+                    : <span style={{ color: "#94a3b8" }}>미정</span>}
+                {item.입고예정일 && <div style={{ color: "#cbd5e1", fontSize: "0.65rem", marginTop: "2px", wordBreak: "break-all" }}>{item.입고예정일}</div>}
+            </td>
+            <td style={{ ...tdStyle, fontWeight: "700", color: "#b45309" }}>{item.미입고수}</td>
+            <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자 || "-"}</td>
+            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem", color: "#94a3b8", wordBreak: "break-all" }}>{item.비고 || "-"}</td>
+        </tr>
+    );
+}
+
+function MobileKce({ data }) {
+    if (data.length === 0) return <EmptyMessage />;
+    return (
+        <div style={{ paddingBottom: "1rem" }}>
+            {data.map((item, idx) => {
+                const dates = (item._schedule || []).map(s => `${fmtD(s.date)}(${s.qty})`).join(", ");
+                return (
+                    <div key={idx} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem", marginBottom: "0.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                            <span style={{ fontWeight: "700", fontSize: "0.875rem", wordBreak: "break-all" }}>{item.품번}</span>
+                            <span style={{ fontSize: "0.8rem", fontWeight: "700", color: "#b45309", whiteSpace: "nowrap" }}>미입고 {item.미입고수}</span>
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "#64748b" }}>발주 {item.발주수량} · {item.발주일 || "-"} · {item.담당자 || "-"}</div>
+                        <div style={{ fontSize: "0.75rem", color: dates ? "#1e40af" : "#94a3b8", marginTop: "0.25rem", fontWeight: "600" }}>{dates || "입고예정 미정"}</div>
+                        {item.비고 && <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginTop: "0.25rem" }}>{item.비고}</div>}
+                    </div>
+                );
+            })}
+        </div>
     );
 }
 
