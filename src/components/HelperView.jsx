@@ -1,7 +1,9 @@
-// HelperView.jsx: 출하 업무 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회
+// HelperView.jsx: 출하 업무 — 퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 및 거래처별 배송 라벨 조회 + 재고 검색
 import { useState } from "react";
 import { quickKeyOf, buildQuickValue, toDateStr, findKnownRecipient } from "../utils";
 import { MethodChip } from "./ShipMethod";
+import { renderStatusBadge } from "./StatusBadge";
+import { tableStyle, theadTrStyle, theadStyle, thStyle, tbodyTrStyle, tdStyle } from "./styles";
 
 // 보내는 사람 (고정값)
 const SENDER = {
@@ -182,7 +184,96 @@ function Empty({ text }) {
     return <div style={{ background: "#fff", borderRadius: 12, padding: "40px 24px", textAlign: "center", color: "#94a3b8", fontSize: 14, boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}>{text}</div>;
 }
 
-export function HelperView({ ships = [], quick = {}, onSave }) {
+// ── 재고 검색 (품번/품명으로 현재고·입고예정·예상재고 조회) ──────
+function InvSearch({ invItems }) {
+    const [q, setQ] = useState("");
+    const query = q.trim().toLowerCase();
+    const filtered = query
+        ? invItems.filter(r => (r.품번 || "").toLowerCase().includes(query) || (r.품명 || "").toLowerCase().includes(query))
+        : invItems;
+
+    const incomingCell = (qty) => qty > 0
+        ? <span style={{ fontWeight: 700, color: "#0284c7" }}>+{qty}</span>
+        : <span style={{ color: "#94a3b8" }}>-</span>;
+
+    return (
+        <>
+            <input
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder="품번 · 품명 검색"
+                style={{ ...inputStyle, width: "100%", padding: "9px 12px", marginBottom: 12 }} />
+            {invItems.length === 0
+                ? <Empty text="재고 데이터가 없습니다. 먼저 재고 파일을 업로드하세요." />
+                : filtered.length === 0
+                    ? <Empty text="검색 결과가 없습니다." />
+                    : (
+                        <div style={{ background: "#fff", borderRadius: 8, boxShadow: "0 1px 3px rgba(0,0,0,.06)", overflowX: "auto" }}>
+                            <table style={tableStyle}>
+                                <thead style={theadStyle}>
+                                    <tr style={theadTrStyle}>
+                                        <th style={{ ...thStyle, textAlign: "left", paddingLeft: "0.6rem" }}>품번</th>
+                                        <th style={{ ...thStyle, textAlign: "left" }}>품명 · 규격</th>
+                                        <th style={thStyle}>현재고</th>
+                                        <th style={thStyle}>생산예정</th>
+                                        <th style={thStyle}>KCE 입고</th>
+                                        <th style={thStyle}>미출하 대기</th>
+                                        <th style={thStyle}>예상재고</th>
+                                        <th style={thStyle}>상태</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {filtered.map((r, i) => (
+                                        <tr key={r.품번 + i} style={tbodyTrStyle}>
+                                            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.6rem", fontWeight: 700 }}>{r.품번 || "-"}</td>
+                                            <td style={{ ...tdStyle, textAlign: "left", wordBreak: "break-all" }}>
+                                                {r.품명 || "-"}{r.규격 ? ` · ${r.규격}` : ""}
+                                            </td>
+                                            <td style={tdStyle}>{r._currentInvQty}</td>
+                                            <td style={tdStyle}>{incomingCell(r._incomingProd)}</td>
+                                            <td style={tdStyle}>{incomingCell(r._kceIncoming)}</td>
+                                            <td style={tdStyle}>{r._pendingDemand > 0 ? r._pendingDemand : <span style={{ color: "#94a3b8" }}>-</span>}</td>
+                                            <td style={{ ...tdStyle, fontWeight: 700, color: r._projectedInvQty < 0 ? "#b45309" : "#334155" }}>{r._projectedInvQty}</td>
+                                            <td style={tdStyle}>{renderStatusBadge(r._status)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+        </>
+    );
+}
+
+// ── 출하 업무 내부 분기 (퀵 관리 / 재고 검색) ──────────────
+const MODE_CARDS = [
+    { key: "quick", title: "퀵 관리", desc: "퀵 지정 · 조회 · 라벨 인쇄", emoji: "⚡", accent: "#4472C4", tint: "#eef2fc" },
+    { key: "inv", title: "재고 검색", desc: "품번 · 품명으로 예상재고 조회", emoji: "📦", accent: "#0b7bad", tint: "#e5f5fc" },
+];
+
+function ModeSelect({ onSelect, quickCount }) {
+    return (
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+            {MODE_CARDS.map(({ key, title, desc, emoji, accent, tint }) => (
+                <button key={key} onClick={() => onSelect(key)} style={{
+                    background: "#fff", border: "1px solid #e2e8f0", borderTop: `3px solid ${accent}`,
+                    borderRadius: 14, width: 230, height: 150, cursor: "pointer",
+                    display: "flex", flexDirection: "column", alignItems: "flex-start", justifyContent: "center",
+                    gap: 6, padding: "18px 20px", boxShadow: "0 1px 3px rgba(0,0,0,.06)", fontFamily: "inherit", textAlign: "left",
+                }}>
+                    <div style={{ width: 42, height: 42, borderRadius: 10, background: tint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, marginBottom: 4 }}>{emoji}</div>
+                    <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#1e293b" }}>
+                        {title}{key === "quick" && quickCount > 0 && <span style={{ marginLeft: 6, fontSize: "0.75rem", color: accent, fontWeight: 700 }}>· {quickCount}건</span>}
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "#64748b" }}>{desc}</div>
+                </button>
+            ))}
+        </div>
+    );
+}
+
+export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
+    const [mode, setMode] = useState("home");
     const [tab, setTab] = useState("assign");
     const [search, setSearch] = useState("");
     const [flash, setFlash] = useState("");
@@ -243,34 +334,61 @@ export function HelperView({ ships = [], quick = {}, onSave }) {
         }}>{label}</button>
     );
 
+    // ── 홈: 퀵 관리 / 재고 검색 분기 카드 ──────────────
+    if (mode === "home") {
+        return (
+            <div style={{ textAlign: "left" }}>
+                <div style={{ marginBottom: 18 }}>
+                    <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1e293b" }}>출하 업무</div>
+                    <div style={{ fontSize: "0.82rem", color: "#64748b", marginTop: 2 }}>작업을 선택하세요</div>
+                </div>
+                <ModeSelect onSelect={setMode} quickCount={groupList.length} />
+            </div>
+        );
+    }
+
+    const backBtn = (
+        <button onClick={() => setMode("home")} style={{
+            background: "#fff", color: "#475569", border: "1px solid #cbd5e1",
+            borderRadius: 8, padding: "8px 12px", cursor: "pointer", fontSize: "0.85rem", fontWeight: 700, fontFamily: "inherit",
+        }}>← 뒤로</button>
+    );
+
     return (
         <div style={{ textAlign: "left" }}>
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
-                {tabBtn("assign", "퀵 지정")}
-                {tabBtn("list", `퀵 조회 (${groupList.length})`)}
+                {backBtn}
                 <span style={{ width: 1, height: 22, background: "#e2e8f0", margin: "0 2px" }} />
-                <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600 }}>빠른 퀵 지정</span>
-                {QUICK_CUSTOMERS.map(name => {
-                    const cnt = matchCustomer(name).length;
-                    return (
-                        <button key={name} onClick={() => assignCustomer(name)} disabled={cnt === 0}
-                            title={cnt === 0 ? "해당 거래처 출하의뢰 없음" : `${name} ${cnt}건을 모두 퀵으로 지정`}
-                            style={{
-                                display: "inline-flex", alignItems: "center", gap: 5,
-                                background: cnt === 0 ? "#f1f5f9" : "#e5f5fc",
-                                color: cnt === 0 ? "#cbd5e1" : "#0b7bad",
-                                border: "1px solid " + (cnt === 0 ? "#e2e8f0" : "#b6e3f7"),
-                                borderRadius: 999, padding: "6px 12px", cursor: cnt === 0 ? "default" : "pointer",
-                                fontSize: "0.78rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap",
-                            }}>
-                            ⚡ {name}{cnt > 0 && <span style={{ fontWeight: 600, opacity: 0.8 }}>· {cnt}</span>}
-                        </button>
-                    );
-                })}
+                {mode === "quick" && <>
+                    {tabBtn("assign", "퀵 지정")}
+                    {tabBtn("list", `퀵 조회 (${groupList.length})`)}
+                    <span style={{ width: 1, height: 22, background: "#e2e8f0", margin: "0 2px" }} />
+                    <span style={{ fontSize: "0.72rem", color: "#94a3b8", fontWeight: 600 }}>빠른 퀵 지정</span>
+                    {QUICK_CUSTOMERS.map(name => {
+                        const cnt = matchCustomer(name).length;
+                        return (
+                            <button key={name} onClick={() => assignCustomer(name)} disabled={cnt === 0}
+                                title={cnt === 0 ? "해당 거래처 출하의뢰 없음" : `${name} ${cnt}건을 모두 퀵으로 지정`}
+                                style={{
+                                    display: "inline-flex", alignItems: "center", gap: 5,
+                                    background: cnt === 0 ? "#f1f5f9" : "#e5f5fc",
+                                    color: cnt === 0 ? "#cbd5e1" : "#0b7bad",
+                                    border: "1px solid " + (cnt === 0 ? "#e2e8f0" : "#b6e3f7"),
+                                    borderRadius: 999, padding: "6px 12px", cursor: cnt === 0 ? "default" : "pointer",
+                                    fontSize: "0.78rem", fontWeight: 700, fontFamily: "inherit", whiteSpace: "nowrap",
+                                }}>
+                                ⚡ {name}{cnt > 0 && <span style={{ fontWeight: 600, opacity: 0.8 }}>· {cnt}</span>}
+                            </button>
+                        );
+                    })}
+                </>}
+                {mode === "inv" && <span style={{ fontSize: "0.95rem", fontWeight: 700, color: "#1e293b" }}>📦 재고 검색</span>}
             </div>
             {flash && <div style={{ fontSize: "0.8rem", color: "#0b7bad", background: "#e5f5fc", border: "1px solid #b6e3f7", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontWeight: 600 }}>✓ {flash}</div>}
 
-            {tab === "assign" ? (
+            {mode === "inv" ? (
+                <InvSearch invItems={invItems} />
+            ) : tab === "assign" ? (
                 <>
                     <input
                         value={search}

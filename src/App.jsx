@@ -379,6 +379,50 @@ export default function App() {
       .sort(byDueDate);
   }, [shipData, invData, prodQtyMap, kceQtyMap]);
 
+  // ── 품목별 예상재고 (재고 검색용) ──────────────────
+  // 특정 출하의뢰의 납기일에 종속되지 않는, "현재 알려진 모든 미출하 수요 + 입고예정"을 반영한 품목 단위 예상재고.
+  // 대시보드의 건별 계산(그룹 내 마지막 납기일 시점 기준)과 동일한 결과가 나오도록,
+  // 미출하 대기 수량 중 가장 늦은 납기일(미확정 납기 포함)을 공급 반영 시점으로 사용한다.
+  const invEnriched = useMemo(() => {
+    const todayStr = toDateStr(new Date());
+    const sumQty = arr => arr.reduce((s, a) => s + (a.qty || 0), 0);
+
+    const demandMap = {};
+    shipData.forEach(r => {
+      if (str(r.품목명).includes("운반비") || str(r.품목명).includes("기타")) return;
+      if (str(r.상태) === "완료") return;
+      const code = str(r.품목번호).toUpperCase();
+      if (!code) return;
+      const due = normDate(r.납기일자);
+      const e = (demandMap[code] ||= { totalDemand: 0, maxDue: null, hasUndated: false });
+      e.totalDemand += (r.수량 || 0);
+      if (!due) e.hasUndated = true;
+      else if (!e.maxDue || due > e.maxDue) e.maxDue = due;
+    });
+
+    return invData.map(inv => {
+      const code = str(inv.품번).toUpperCase();
+      const currentInv = inv.재고수량 || 0;
+      const prodPending = (prodQtyMap[code] || []).filter(a => !a.date || a.date >= todayStr);
+      const kceInfo = kceQtyMap[code] || { arrivals: [], undated: 0 };
+      const demand = demandMap[code];
+      // 미출하 대기 건이 없거나, 그중 납기 미확정 건이 있으면 입고예정 전부를 가용으로 간주
+      const inTime = a => !demand || demand.hasUndated || !demand.maxDue || a.date <= demand.maxDue;
+
+      const prodIncoming = sumQty(prodPending.filter(inTime));
+      const kceIncoming = sumQty(kceInfo.arrivals.filter(inTime)) + kceInfo.undated;
+      const pendingDemand = demand?.totalDemand || 0;
+      const projected = currentInv + prodIncoming + kceIncoming - pendingDemand;
+
+      return {
+        품번: inv.품번, 품명: inv.품명, 규격: inv.규격,
+        _currentInvQty: currentInv, _incomingProd: prodIncoming, _kceIncoming: kceIncoming,
+        _pendingDemand: pendingDemand, _projectedInvQty: projected,
+        _status: projected < 0 ? "shortage" : "ok",
+      };
+    });
+  }, [invData, shipData, prodQtyMap, kceQtyMap]);
+
   // ── 국내/해외 분리 ─────────────────────────────
   const shipOvsEnriched = useMemo(() => shipEnriched.filter(r => ["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
   const shipDomEnriched = useMemo(() => shipEnriched.filter(r => !["이우제", "김윤식"].includes(str(r.담당자))), [shipEnriched]);
@@ -521,7 +565,7 @@ export default function App() {
 
         <div className="page-container" style={{ padding: "16px" }}>
           {screen === "helper" ? (
-            <HelperView ships={shipData} quick={quick} onSave={handleSaveQuick} />
+            <HelperView ships={shipData} quick={quick} onSave={handleSaveQuick} invItems={invEnriched} />
           ) : view === "input" ? (
             <InputView
               handleResetData={handleResetData}
