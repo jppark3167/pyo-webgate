@@ -131,6 +131,24 @@ export const nextShipMethod = (current) => {
     return cycle[(idx + 1) % cycle.length];
 };
 
+// 출하 진행상태 종류 + 칩 색상 (창고대기가 기본값 — 항상 값이 있어 미지정 상태 없음)
+export const SHIP_STAGES = [
+    { key: "창고대기", bg: "#f1f5f9", color: "#64748b" },
+    { key: "출고중", bg: "#fef9c3", color: "#a16207" },
+    { key: "포장완료", bg: "#dbeafe", color: "#1d4ed8" },
+    { key: "출하대기", bg: "#ffedd5", color: "#c2410c" },
+    { key: "출하완료", bg: "#dcfce7", color: "#15803d" },
+];
+export const SHIP_STAGE_DONE = SHIP_STAGES[SHIP_STAGES.length - 1].key;
+
+// 출하 진행상태 순환: 창고대기 → 출고중 → 포장완료 → 출하대기 → 출하완료 → (다시 창고대기)
+// 값이 없으면(미저장) 창고대기(기본값)에서 시작한 것으로 간주해 다음 단계로 진행
+export const nextShipStage = (current) => {
+    const idx = SHIP_STAGES.findIndex(s => s.key === current);
+    const from = idx === -1 ? 0 : idx;
+    return SHIP_STAGES[(from + 1) % SHIP_STAGES.length].key;
+};
+
 // 저장 식별자: 출하의뢰번호 우선, 없으면 거래처+품목번호+납기일자 (DashView 메모키와 동일 규칙)
 export const quickKeyOf = (r) => str(r.출하의뢰번호) || `${str(r.거래처명)}_${str(r.품목번호)}_${str(r.납기일자)}`;
 
@@ -154,13 +172,14 @@ export function findKnownRecipient(name) {
     }) || null;
 }
 
-// 저장 값 = 출하방법 + 주소/박스수 + 조회용 스냅샷 (출하 리스트가 바뀌어도 조회 가능하도록)
-export function buildQuickValue(row, { method = "", address = "", boxCount = 0, phone = "" } = {}) {
+// 저장 값 = 출하방법 + 주소/박스수 + 진행상태 + 조회용 스냅샷 (출하 리스트가 바뀌어도 조회 가능하도록)
+export function buildQuickValue(row, { method = "", address = "", boxCount = 0, phone = "", 상태 = SHIP_STAGES[0].key } = {}) {
     return {
         method,
         address: (address || "").trim(),
         phone: (phone || "").trim(),
         boxCount: Number(boxCount) || 0,
+        상태,
         거래처명: row.거래처명 || "",
         품목명: row.품목명 || "",
         품목번호: row.품목번호 || "",
