@@ -58,11 +58,10 @@ export const processProdFile = (file, onSuccess, onError) => {
                 }))
                 .filter(item => {
                     if (!item.제품코드) return false;
+                    // 생산계획일자가 비어있으면(날짜 미정) 그대로 통과 — 대시보드에서 "날짜미정"으로 표시됨
                     if (item.생산계획일자) {
                         const itemDate = new Date(item.생산계획일자);
                         if (itemDate < cutoffDate) return false;
-                    } else {
-                        return false;
                     }
                     return true;
                 });
