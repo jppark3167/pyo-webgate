@@ -6,7 +6,9 @@ export const processProdFile = (file, onSuccess, onError) => {
     const reader = new FileReader();
     reader.onload = e => {
         try {
-            const wb = XLSX.read(e.target.result, { type: "array", cellDates: true });
+            // cellDates:true는 xlsx 라이브러리가 KST 등 UTC+ 환경에서 Date 객체를 하루 앞당겨 생성하는 버그가 있어
+            // 사용하지 않음 — 대신 원본 시리얼 숫자를 그대로 두고 fmtXlDate()의 숫자 변환(UTC 기준, 정확함)을 사용
+            const wb = XLSX.read(e.target.result, { type: "array" });
             const ws = wb.Sheets[wb.SheetNames[0]];
             const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
