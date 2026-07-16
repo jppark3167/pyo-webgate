@@ -74,6 +74,9 @@ export default function App() {
   const [kceSheetUrl, setKceSheetUrl] = useState("");
   const [kceLastSync, setKceLastSync] = useState("");
   const [kceSyncing, setKceSyncing] = useState(false);
+  const [shipSheetUrl, setShipSheetUrl] = useState("");
+  const [shipLastSync, setShipLastSync] = useState("");
+  const [shipSyncing, setShipSyncing] = useState(false);
   const [parseMsg, setParseMsg] = useState(null);
   const [mainTab, setMainTab] = useState("ship_dom");
   const [search, setSearch] = useState("");
@@ -101,6 +104,8 @@ export default function App() {
         setInvFile(db.invFile || "");
         setKceSheetUrl(db.kceSheetUrl || "");
         setKceLastSync(db.kceLastSync || "");
+        setShipSheetUrl(db.shipSheetUrl || "");
+        setShipLastSync(db.shipLastSync || "");
       })
       .catch((e) => {
         if (cancelled) return;
@@ -196,6 +201,27 @@ export default function App() {
     } catch (error) {
       console.error(error);
       setParseMsg("❌ 파싱 중 오류가 발생했습니다. 데이터 형식을 다시 확인해주세요.");
+    }
+  };
+
+  // ── 출하의뢰 — 구글 시트(뷰어 공개) 동기화 ─────────────
+  // 서버가 1시간마다 자동 동기화하지만, 버튼으로도 즉시 동기화 가능
+  const handleShipSync = async (urlOverride) => {
+    const url = (urlOverride ?? shipSheetUrl).trim();
+    if (!url) { setParseMsg("⚠️ 구글 시트 URL을 입력하세요"); return; }
+    setShipSyncing(true);
+    try {
+      const result = await api.syncShip(url);
+      setShipData(result.shipData || []);
+      setShipSheetUrl(url);
+      setShipLastSync(result.syncedAt || "");
+      setQuick({});   // 출하의뢰 교체 시 기존 퀵 지정도 초기화 (서버와 동일)
+      setParseMsg(`✅ 구글 시트 동기화 완료 (${result.count}건)`);
+    } catch (e) {
+      console.error(e);
+      setParseMsg(`❌ 구글 시트 동기화 실패: ${e.message}`);
+    } finally {
+      setShipSyncing(false);
     }
   };
 
@@ -625,6 +651,12 @@ export default function App() {
               shipText={shipText}
               setShipText={setShipText}
               handleShipParse={handleShipParse}
+              shipData={shipData}
+              shipSheetUrl={shipSheetUrl}
+              setShipSheetUrl={setShipSheetUrl}
+              handleShipSync={handleShipSync}
+              shipSyncing={shipSyncing}
+              shipLastSync={shipLastSync}
               kceText={kceText}
               setKceText={setKceText}
               handleKceParse={handleKceParse}

@@ -157,10 +157,14 @@ export const KNOWN_RECIPIENTS = [
     { name: "애니원", address: "서울특별시 용산구 효창원로69나길 13 101호(효창동, 성부빌딩)", phone: "02-2138-6291" },
     { name: "티에스에스", address: "서울시 용산구 효창원로 64길 21 창미빌딩 1~2층 (효창동 5-427)", phone: "02-718-6291" },
     { name: "세이프", address: "경기도 구리시 동구릉로 427 1층 (사노동)", phone: "1522-7759" },
+    { name: "티컴퍼니", address: "강원 횡성군 중앙로 13 2층 티컴퍼니", phone: "033-343-7761" },
 ];
 
 // 거래처명 정규화: (주)/㈜/주식회사/공백 제거
-const normName = (s) => str(s).replace(/\(주\)|\(㈜\)|㈜|주식회사/g, "").replace(/\s+/g, "");
+export const normName = (s) => str(s).replace(/\(주\)|\(㈜\)|㈜|주식회사/g, "").replace(/\s+/g, "");
+
+// 거래처명 앞 괄호 접두어(예: "(유통)애니원" → "애니원") 제거 — 데이터는 원본 유지, 화면 표시용
+export const stripCustomerPrefix = (name) => str(name).replace(/^\([^)]*\)\s*/, "");
 
 // 거래처명으로 주소록 매칭 (부분 포함 허용)
 export function findKnownRecipient(name) {

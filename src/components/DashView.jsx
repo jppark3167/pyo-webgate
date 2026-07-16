@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { fmtD, quickKeyOf, buildQuickValue, findKnownRecipient, nextShipMethod } from "../utils";
+import { fmtD, quickKeyOf, buildQuickValue, findKnownRecipient, nextShipMethod, stripCustomerPrefix } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
 import { MethodCycleChip } from "./ShipMethod";
 import { ShipCard } from "./ShipCard";
@@ -257,7 +257,7 @@ function ShipRow({ item, method, onCycle }) {
     return (
         <tr style={tbodyTrStyle}>
             <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{fmtD(item.납기일자)}</td>
-            <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{item.거래처명}</td>
+            <td style={{ ...tdStyle, fontWeight: "600", textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{stripCustomerPrefix(item.거래처명)}</td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
                 <div style={{ fontWeight: "600", wordBreak: "break-all" }}>{item.품목명}</div>
                 <div style={{ fontSize: "0.65rem", color: "#94a3b8", marginTop: "2px", wordBreak: "break-all" }}>{item.품목번호}</div>
@@ -413,7 +413,7 @@ function SummaryAccordion({ item, allShipData, selectedDate, setSelectedDate, ed
                                     const rowBg = (d._noteType === "kce" && memoVal) ? "#f5f3ff" : d._status === "shortage" ? "#fffbeb" : undefined;
                                     return (
                                         <tr key={di} style={{ ...tbodyTrStyle, background: rowBg }}>
-                                            <td style={{ ...tdStyle, fontWeight: "600" }}>{d.거래처명}</td>
+                                            <td style={{ ...tdStyle, fontWeight: "600" }}>{stripCustomerPrefix(d.거래처명)}</td>
                                             <td style={{ ...tdStyle, textAlign: "left" }}>
                                                 <div style={{ fontWeight: "600" }}>{d.품목명}</div>
                                                 <div style={{ fontSize: "0.6875rem", color: "#64748b", marginTop: "2px" }}>{d.규격}</div>
@@ -480,7 +480,7 @@ function MobileSummary({ data, allShipData, selectedDate, setSelectedDate, memos
                             return (
                                 <div key={di} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem", marginBottom: "0.375rem", marginLeft: "0.5rem" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                                        <span style={{ fontWeight: "700", fontSize: "0.875rem" }}>{d.거래처명}</span>
+                                        <span style={{ fontWeight: "700", fontSize: "0.875rem" }}>{stripCustomerPrefix(d.거래처명)}</span>
                                         <span style={{ fontSize: "0.75rem", color: "#64748b" }}>{d.담당자}</span>
                                     </div>
                                     <div style={{ fontSize: "0.8rem", color: "#334155", marginBottom: "0.25rem" }}>{d.품목명}</div>

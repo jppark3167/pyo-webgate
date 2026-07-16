@@ -2,7 +2,8 @@ export function InputView({
     handleResetData, parseMsg,
     handleProdFile, prodData, prodFile,
     handleInvFile, invData, invFile,
-    shipText, setShipText, handleShipParse,
+    shipText, setShipText, handleShipParse, shipData,
+    shipSheetUrl, setShipSheetUrl, handleShipSync, shipSyncing, shipLastSync,
     kceText, setKceText, handleKceParse, kceData,
     kceSheetUrl, setKceSheetUrl, handleKceSync, kceSyncing, kceLastSync
 }) {
@@ -25,7 +26,42 @@ export function InputView({
                 {invFile && <Status text={`✅ ${invFile} (총 ${invData?.length || 0}건)`} />}
             </Card>
 
-            <Card title="🚚 출하 의뢰 텍스트 붙여넣기">
+            <Card title="🔗 출하 의뢰 — 구글 시트 자동 동기화">
+                <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 0, marginBottom: "0.75rem" }}>
+                    "링크가 있는 모든 사용자(뷰어)"로 공개된 구글 시트 링크를 등록하면 1시간마다 자동으로 최신 데이터를 가져옵니다. 컬럼 순서: 납기일 / 거래처명 / 품명 / 품목번호 / 수량 / 비고.
+                </p>
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                    <input
+                        type="text"
+                        value={shipSheetUrl}
+                        onChange={e => setShipSheetUrl(e.target.value)}
+                        placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=..."
+                        style={{ flex: "1 1 260px", padding: "0.6rem 0.75rem", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "0.8125rem", boxSizing: "border-box", fontFamily: "inherit" }} />
+                    <button
+                        onClick={() => handleShipSync()}
+                        disabled={shipSyncing || !shipSheetUrl?.trim()}
+                        style={{
+                            background: shipSyncing ? "#94a3b8" : "#0f766e", color: "#fff", border: "none", borderRadius: "6px",
+                            padding: "0.6rem 1rem", fontSize: "0.8125rem", fontWeight: "600",
+                            cursor: shipSyncing || !shipSheetUrl?.trim() ? "default" : "pointer", whiteSpace: "nowrap",
+                        }}>
+                        {shipSyncing ? "동기화 중..." : "🔄 지금 동기화"}
+                    </button>
+                </div>
+                {shipLastSync && (
+                    <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.5rem", marginBottom: 0 }}>
+                        마지막 동기화: {new Date(shipLastSync).toLocaleString("ko-KR")}
+                    </p>
+                )}
+                {shipData?.length > 0 && (
+                    <Status text={`✅ 출하의뢰 ${shipData.length}건`} />
+                )}
+            </Card>
+
+            <Card title="🚚 출하 의뢰 텍스트 붙여넣기 (수동)">
+                <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 0, marginBottom: "0.75rem" }}>
+                    구글 시트 연동 대신 직접 붙여넣을 수도 있습니다. 붙여넣으면 기존 출하 목록 전체를 교체합니다.
+                </p>
                 <TextArea value={shipText} onChange={setShipText} placeholder="ERP에서 복사한 출하 의뢰 텍스트를 붙여넣으세요..." />
                 <SubmitButton onClick={handleShipParse} label="데이터 파싱 및 출하 목록 적용" />
                 {parseMsg && <p style={{ fontSize: "0.8125rem", color: parseMsg.includes("✅") ? "#166534" : "#b91c1c", marginTop: "0.75rem", fontWeight: "600" }}>{parseMsg}</p>}

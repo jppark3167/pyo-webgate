@@ -1,6 +1,6 @@
 // StatusBoard.jsx: 출하 업무 — 출하 상태 (오늘 납기 출하의뢰 전체의 진행상태 확인/변경, 완료 건은 아래로 분리)
 import { useState } from "react";
-import { quickKeyOf, buildQuickValue, toDateStr, normDate, SHIP_STAGES, SHIP_STAGE_DONE, nextShipStage } from "../../utils";
+import { quickKeyOf, buildQuickValue, toDateStr, normDate, stripCustomerPrefix, SHIP_STAGES, SHIP_STAGE_DONE, nextShipStage } from "../../utils";
 import { StageCycleChip } from "../ShipMethod";
 import { inputStyle } from "./styles";
 import { Empty } from "./shared";
@@ -21,7 +21,7 @@ function StatusCard({ row, saved, onSave }) {
             display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10,
         }}>
             <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, color: "#334155", wordBreak: "keep-all" }}>{row.거래처명 || "-"}</div>
+                <div style={{ fontWeight: 700, color: "#334155", wordBreak: "keep-all" }}>{stripCustomerPrefix(row.거래처명) || "-"}</div>
                 <div style={{ fontSize: "0.8rem", color: "#475569", marginTop: 2, wordBreak: "break-all" }}>
                     {row.품목명}{row.규격 ? ` · ${row.규격}` : ""}
                 </div>

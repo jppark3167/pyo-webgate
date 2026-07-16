@@ -55,6 +55,7 @@ export const api = {
     saveInv: (invData, fileName) => req("POST", "/api/inv", { invData, fileName }),
     saveKce: (kceData) => req("POST", "/api/kce", { kceData }),
     syncKce: (sheetUrl) => req("POST", "/api/kce/sync", sheetUrl ? { sheetUrl } : {}),
+    syncShip: (sheetUrl) => req("POST", "/api/ship/sync", sheetUrl ? { sheetUrl } : {}),
     saveMemo: (key, value) => req("PATCH", "/api/memos", { key, value }),
     saveQuick: (key, value) => req("PATCH", "/api/quick", { key, value }),
     resetAll: () => req("DELETE", "/api/data"),

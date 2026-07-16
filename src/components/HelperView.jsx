@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ModeSelect } from "./helper/ModeSelect";
 import { QuickBoard } from "./helper/QuickBoard";
 import { StatusBoard } from "./helper/StatusBoard";
+import { DateShipBoard } from "./helper/DateShipBoard";
 import { CloseoutBoard } from "./helper/CloseoutBoard";
 import { InvSearch } from "./helper/InvSearch";
 
@@ -39,6 +40,7 @@ export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
 
             {mode === "quick" && <QuickBoard ships={ships} quick={quick} onSave={onSave} />}
             {mode === "status" && <StatusBoard ships={ships} quick={quick} onSave={onSave} />}
+            {mode === "datelist" && <DateShipBoard ships={ships} quick={quick} />}
             {mode === "closeout" && <CloseoutBoard />}
             {mode === "inv" && <InvSearch invItems={invItems} />}
         </div>

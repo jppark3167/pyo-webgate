@@ -2,6 +2,7 @@
 const MODE_CARDS = [
     { key: "quick", title: "퀵 관리", desc: "퀵 지정 · 조회 · 라벨 인쇄", emoji: "⚡", accent: "#4472C4", tint: "#eef2fc" },
     { key: "status", title: "출하 상태", desc: "출하 진행 상태 확인 · 변경", emoji: "🚦", accent: "#f59e0b", tint: "#fef3c7" },
+    { key: "datelist", title: "날짜별 출하", desc: "날짜 선택해 거래처별 출하 리스트 조회", emoji: "📅", accent: "#7c3aed", tint: "#ede9fe" },
     { key: "closeout", title: "일마감", desc: "출하 내역을 채팅방 공유 양식으로 변환", emoji: "📤", accent: "#059669", tint: "#d1fae5" },
     { key: "inv", title: "재고 검색", desc: "품번 · 품명으로 예상재고 조회", emoji: "📦", accent: "#0b7bad", tint: "#e5f5fc" },
 ];

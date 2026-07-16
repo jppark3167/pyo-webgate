@@ -1,6 +1,6 @@
 // QuickBoard.jsx: 출하 업무 — 퀵 관리 (퀵 배송 출하의뢰 지정 + 주소/연락처/박스수 입력 + 거래처별 배송 라벨 조회/인쇄)
 import { useState } from "react";
-import { quickKeyOf, buildQuickValue, toDateStr, normDate, findKnownRecipient, SHIP_STAGES } from "../../utils";
+import { quickKeyOf, buildQuickValue, toDateStr, normDate, findKnownRecipient, stripCustomerPrefix, SHIP_STAGES } from "../../utils";
 import { MethodChip } from "../ShipMethod";
 import { inputStyle, btn } from "./styles";
 import { Empty } from "./shared";
@@ -47,7 +47,7 @@ function QuickCard({ qkey, row, saved, onSave }) {
         }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                 <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, color: "#334155", wordBreak: "keep-all" }}>{row.거래처명 || "-"}</div>
+                    <div style={{ fontWeight: 700, color: "#334155", wordBreak: "keep-all" }}>{stripCustomerPrefix(row.거래처명) || "-"}</div>
                     <div style={{ fontSize: "0.8rem", color: "#475569", marginTop: 2, wordBreak: "break-all" }}>
                         {row.품목명}{row.규격 ? ` · ${row.규격}` : ""}
                     </div>
@@ -89,6 +89,7 @@ const PAGE_W_MM = 297, PAGE_H_MM = 210;
 const PX_TO_MM = 25.4 / 96;
 
 function QuickLabel({ name, items, onRemove }) {
+    const displayName = stripCustomerPrefix(name) || name;   // 화면·라벨 표시용 (그룹핑 키는 원본 name 그대로 사용)
     const labelId = "qlabel-" + name.replace(/[^a-zA-Z0-9가-힣]/g, "");
     const known = findKnownRecipient(name);   // 입력값이 없으면 주소록으로 보완
     const address = items.find(i => i.address)?.address || known?.address || "";
@@ -104,7 +105,7 @@ function QuickLabel({ name, items, onRemove }) {
         if (!w) return;
         // 라벨을 A4 가로 한 장에 여백 없이 꽉 차도록 비율 유지 확대
         const scale = Math.min(PAGE_W_MM / (el.offsetWidth * PX_TO_MM), PAGE_H_MM / (el.offsetHeight * PX_TO_MM));
-        w.document.write(`<html><head><title>배송 라벨 - ${name}</title><style>
+        w.document.write(`<html><head><title>배송 라벨 - ${displayName}</title><style>
             @page { size: landscape; margin: 0; }
             html, body { margin: 0; padding: 0; }
             .no-print{ display: none !important; }
@@ -120,7 +121,7 @@ function QuickLabel({ name, items, onRemove }) {
         <div style={{ marginBottom: 18 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <div style={{ fontWeight: 700, color: "#334155" }}>
-                    {name} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: "0.8rem" }}>· {items.length}건 · {totalBox} Box</span>
+                    {displayName} <span style={{ color: "#94a3b8", fontWeight: 400, fontSize: "0.8rem" }}>· {items.length}건 · {totalBox} Box</span>
                 </div>
                 <button style={btn("#1e3a5f", "#fff")} onClick={print}>🖨 인쇄</button>
             </div>
@@ -177,7 +178,7 @@ function QuickLabel({ name, items, onRemove }) {
                     <div style={{ alignSelf: "end", textAlign: "left" }}>
                         <span style={boxedLabel}>받는사람</span>
                         <div style={{ fontSize: 17, fontWeight: 700, marginTop: 10, wordBreak: "keep-all" }}>{address || "(주소 미입력)"}</div>
-                        <div style={{ fontSize: 22, fontWeight: 700, marginTop: 10 }}>{name}</div>
+                        <div style={{ fontSize: 22, fontWeight: 700, marginTop: 10 }}>{displayName}</div>
                         {phone && <div style={{ fontSize: 22, fontWeight: 700, marginTop: 4 }}>{phone}</div>}
                     </div>
                 </div>
@@ -311,7 +312,7 @@ export function QuickBoard({ ships, quick, onSave }) {
                             placeholder="거래처명"
                             style={{ ...inputStyle, flex: "1 1 140px", minWidth: 0 }} />
                         <datalist id="quick-group-names">
-                            {groupList.map(([name]) => <option key={name} value={name} />)}
+                            {groupList.map(([name]) => <option key={name} value={stripCustomerPrefix(name) || name} />)}
                         </datalist>
                         <input
                             value={manualForm.product}

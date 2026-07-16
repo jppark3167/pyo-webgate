@@ -1,11 +1,8 @@
 // CloseoutBoard.jsx: 출하 업무 — 일마감 (출하 내역 텍스트를 건별 채팅방 공유 양식으로 변환)
 import { useState, useMemo } from "react";
-import { toDateStr, parseTSV, str } from "../../utils";
+import { toDateStr, parseTSV, str, stripCustomerPrefix } from "../../utils";
 import { btn } from "./styles";
 import { Empty } from "./shared";
-
-// 거래처명 앞 괄호 접두어(예: "(유통)") 제거
-const stripCustomerPrefix = (name) => str(name).replace(/^\([^)]*\)\s*/, "");
 
 // 채팅방 공유 텍스트에 표기할 출하방법 — 비고의 [태그] 내용과 무관하게 항상 "택배"로 고정
 const CLOSEOUT_METHOD = "택배";

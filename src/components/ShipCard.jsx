@@ -1,4 +1,4 @@
-import { fmtD } from "../utils";
+import { fmtD, stripCustomerPrefix } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
 import { MethodCycleChip } from "./ShipMethod";
 
@@ -25,7 +25,7 @@ export function ShipCard({ item, method, onCycle }) {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.375rem" }}>
                 <span style={{ fontWeight: "700", fontSize: "0.9rem", color: "#1e3a5f", display: "flex", alignItems: "center", gap: "0.375rem", flexWrap: "wrap" }}>
-                    {item.거래처명}
+                    {stripCustomerPrefix(item.거래처명)}
                     <MethodCycleChip method={method} onCycle={onCycle} size="md" />
                 </span>
                 <span style={{ fontSize: "0.75rem", color: "#64748b", marginLeft: "0.5rem", whiteSpace: "nowrap" }}>{item.담당자}</span>

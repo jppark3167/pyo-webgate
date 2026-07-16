@@ -6,6 +6,7 @@ const fs = require("fs");
 const { MongoClient } = require("mongodb");
 const crypto = require("crypto");
 const { fetchAndParseKceSheet } = require("./kceSync");
+const { fetchAndParseShipSheet } = require("./shipSync");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -120,6 +121,8 @@ app.get("/api/data", async (req, res) => {
             invFile: meta.invFile || "",
             kceSheetUrl: meta.kceSheetUrl || "",
             kceLastSync: meta.kceLastSync || "",
+            shipSheetUrl: meta.shipSheetUrl || "",
+            shipLastSync: meta.shipLastSync || "",
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -134,6 +137,28 @@ app.post("/api/ship", async (req, res) => {
         // 출하의뢰가 새로 교체되면 기존 퀵 지정도 함께 초기화
         await db.collection("quickData").deleteMany({});
         res.json({ ok: true, count: shipData.length });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// 출하의뢰 — 구글 시트(뷰어 공개) 즉시 동기화. sheetUrl 생략 시 마지막으로 저장된 URL 사용
+app.post("/api/ship/sync", async (req, res) => {
+    try {
+        const bodyUrl = (req.body && req.body.sheetUrl || "").trim();
+        const saved = await db.collection("meta").findOne({ _id: "shipSheetUrl" });
+        const sheetUrl = bodyUrl || (saved && saved.value) || "";
+        if (!sheetUrl) return res.status(400).json({ error: "구글 시트 URL이 설정되어 있지 않습니다." });
+
+        const parsed = await fetchAndParseShipSheet(sheetUrl);
+        await db.collection("shipData").deleteMany({});
+        if (parsed.length > 0) await db.collection("shipData").insertMany(parsed);
+        // 출하의뢰가 새로 교체되면 기존 퀵 지정도 함께 초기화
+        await db.collection("quickData").deleteMany({});
+
+        const syncedAt = new Date().toISOString();
+        await db.collection("meta").updateOne({ _id: "shipSheetUrl" }, { $set: { value: sheetUrl } }, { upsert: true });
+        await db.collection("meta").updateOne({ _id: "shipLastSync" }, { $set: { value: syncedAt } }, { upsert: true });
+
+        res.json({ ok: true, count: parsed.length, syncedAt, shipData: parsed });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -266,6 +291,23 @@ async function runAutoKceSync() {
     }
 }
 
+// 출하의뢰 자동 동기화 — 저장된 구글 시트 URL이 있을 때만 수행, 실패해도 서버는 계속 동작
+const SHIP_SYNC_INTERVAL_MS = 60 * 60 * 1000; // 1시간
+async function runAutoShipSync() {
+    try {
+        const saved = await db.collection("meta").findOne({ _id: "shipSheetUrl" });
+        const sheetUrl = saved && saved.value;
+        if (!sheetUrl) return;
+        const parsed = await fetchAndParseShipSheet(sheetUrl);
+        await db.collection("shipData").deleteMany({});
+        if (parsed.length > 0) await db.collection("shipData").insertMany(parsed);
+        await db.collection("meta").updateOne({ _id: "shipLastSync" }, { $set: { value: new Date().toISOString() } }, { upsert: true });
+        console.log(`✅ 출하의뢰 자동 동기화 완료 (${parsed.length}건)`);
+    } catch (e) {
+        console.error("⚠️ 출하의뢰 자동 동기화 실패:", e.message);
+    }
+}
+
 // 서버 시작
 connectDB().then(() => {
     app.listen(PORT, "0.0.0.0", () => {
@@ -273,6 +315,8 @@ connectDB().then(() => {
     });
     runAutoKceSync();
     setInterval(runAutoKceSync, KCE_SYNC_INTERVAL_MS);
+    runAutoShipSync();
+    setInterval(runAutoShipSync, SHIP_SYNC_INTERVAL_MS);
 }).catch(err => {
     console.error("❌ MongoDB 연결 실패:", err);
     process.exit(1);
