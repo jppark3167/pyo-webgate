@@ -79,8 +79,10 @@ function splitExportedTsv(text) {
 }
 
 // 구글 시트 공유/편집 링크 → TSV 내보내기 URL로 변환 (이미 export URL이면 그대로 사용)
+// 비공개 시트는 Apps Script 웹앱 URL(script.google.com)을 그대로 써서 TSV를 반환받을 수도 있다.
 function toExportUrl(sheetUrl) {
     if (/\/export\?/.test(sheetUrl)) return sheetUrl;
+    if (/^https:\/\/script\.google\.com\//.test(sheetUrl)) return sheetUrl;
     const idMatch = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if (!idMatch) throw new Error("올바른 구글 시트 링크가 아닙니다.");
     const gidMatch = sheetUrl.match(/[?#&]gid=(\d+)/);

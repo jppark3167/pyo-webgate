@@ -28,14 +28,15 @@ export function InputView({
 
             <Card title="🔗 출하 의뢰 — 구글 시트 자동 동기화">
                 <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 0, marginBottom: "0.75rem" }}>
-                    "링크가 있는 모든 사용자(뷰어)"로 공개된 구글 시트 링크를 등록하면 1시간마다 자동으로 최신 데이터를 가져옵니다. 컬럼 순서: 납기일 / 거래처명 / 품명 / 품목번호 / 수량 / 비고.
+                    "링크가 있는 모든 사용자(뷰어)"로 공개된 구글 시트 링크를 등록하면 1시간마다 자동으로 최신 데이터를 가져옵니다. 컬럼 순서: 납기일 / 거래처명 / 품명 / 품목번호 / 수량 / 비고.<br />
+                    시트가 비공개(접근 권한자만 열람)라면, 대신 Apps Script로 배포한 웹앱 URL(script.google.com/.../exec)을 등록하세요 — 시트는 비공개로 유지됩니다.
                 </p>
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                     <input
                         type="text"
                         value={shipSheetUrl}
                         onChange={e => setShipSheetUrl(e.target.value)}
-                        placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=..."
+                        placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=... 또는 Apps Script 웹앱 URL"
                         style={{ flex: "1 1 260px", padding: "0.6rem 0.75rem", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "0.8125rem", boxSizing: "border-box", fontFamily: "inherit" }} />
                     <button
                         onClick={() => handleShipSync()}

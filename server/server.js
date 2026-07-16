@@ -6,7 +6,7 @@ const fs = require("fs");
 const { MongoClient } = require("mongodb");
 const crypto = require("crypto");
 const { fetchAndParseKceSheet } = require("./kceSync");
-const { fetchAndParseShipSheet } = require("./shipSync");
+const { fetchAndParseShipSheet, buildQuickSeeds } = require("./shipSync");
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -73,6 +73,25 @@ app.use("/api", (req, res, next) => {
     if (token !== AUTH_TOKEN) return res.status(401).json({ error: "인증이 필요합니다." });
     next();
 });
+
+// 출하타입 힌트가 있는 행만 quickData에 시드 — 이미 있는 key는 건드리지 않음(자동 동기화가 기존 퀵 지정을 덮어쓰지 않도록)
+async function seedShipQuick(parsed) {
+    const seeds = buildQuickSeeds(parsed);
+    const keys = Object.keys(seeds);
+    if (keys.length === 0) return;
+    await Promise.all(keys.map(key =>
+        db.collection("quickData").updateOne(
+            { key }, { $setOnInsert: { key, value: seeds[key] } }, { upsert: true }
+        )
+    ));
+}
+
+async function loadQuickMap() {
+    const docs = await db.collection("quickData").find().toArray();
+    const quick = {};
+    docs.forEach(q => { quick[q.key] = q.value; });
+    return quick;
+}
 
 // ── API ───────────────────────────────────────
 
@@ -151,14 +170,16 @@ app.post("/api/ship/sync", async (req, res) => {
         const parsed = await fetchAndParseShipSheet(sheetUrl);
         await db.collection("shipData").deleteMany({});
         if (parsed.length > 0) await db.collection("shipData").insertMany(parsed);
-        // 출하의뢰가 새로 교체되면 기존 퀵 지정도 함께 초기화
+        // 출하의뢰가 새로 교체되면 기존 퀵 지정도 함께 초기화한 뒤, 출하타입 힌트가 있는 항목은 다시 시드
         await db.collection("quickData").deleteMany({});
+        await seedShipQuick(parsed);
 
         const syncedAt = new Date().toISOString();
         await db.collection("meta").updateOne({ _id: "shipSheetUrl" }, { $set: { value: sheetUrl } }, { upsert: true });
         await db.collection("meta").updateOne({ _id: "shipLastSync" }, { $set: { value: syncedAt } }, { upsert: true });
 
-        res.json({ ok: true, count: parsed.length, syncedAt, shipData: parsed });
+        const quick = await loadQuickMap();
+        res.json({ ok: true, count: parsed.length, syncedAt, shipData: parsed, quick });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -301,6 +322,7 @@ async function runAutoShipSync() {
         const parsed = await fetchAndParseShipSheet(sheetUrl);
         await db.collection("shipData").deleteMany({});
         if (parsed.length > 0) await db.collection("shipData").insertMany(parsed);
+        await seedShipQuick(parsed);   // 기존 퀵 지정은 건드리지 않고, 새로 나타난 힌트 항목만 채움
         await db.collection("meta").updateOne({ _id: "shipLastSync" }, { $set: { value: new Date().toISOString() } }, { upsert: true });
         console.log(`✅ 출하의뢰 자동 동기화 완료 (${parsed.length}건)`);
     } catch (e) {

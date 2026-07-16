@@ -215,7 +215,7 @@ export default function App() {
       setShipData(result.shipData || []);
       setShipSheetUrl(url);
       setShipLastSync(result.syncedAt || "");
-      setQuick({});   // 출하의뢰 교체 시 기존 퀵 지정도 초기화 (서버와 동일)
+      setQuick(result.quick || {});   // 서버가 초기화 + 출하타입 힌트(퀵 등) 시드까지 반영한 최신 상태
       setParseMsg(`✅ 구글 시트 동기화 완료 (${result.count}건)`);
     } catch (e) {
       console.error(e);
