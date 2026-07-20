@@ -387,11 +387,17 @@ export default function App() {
         const prodInTimeSum = sumQty(prodInTime);
         const kceInTimeSum = sumQty(kceInTime) + kceUndated;
 
-        // 결제란에 "후결"이 아닌 실제 정산액이 적혀 있으면 이미 결제 완료된 건 → 완료 취급(재고계산 제외).
-        // 결제란이 비어있는 건(애니원 탭 등 결제 개념이 없는 소스)은 기존과 동일하게 항상 수요로 카운트.
+        // 결제란에 "후결"이 아닌 실제 정산액이 적혀 있으면 "선발행 건" — 이미 반영된 것이 아니라
+        // 오히려 그만큼 가용재고에 더해줘야 하는 건(수량만큼 +가산). 결제란이 비어있는 건(애니원 탭 등
+        // 결제 개념이 없는 소스)은 기존과 동일하게 항상 수요로 카운트.
         const isSettled = str(r.결제) !== "" && str(r.결제) !== "후결";
-        const countsAsDemand = str(r.상태) !== "완료" && !isSettled;
-        cumDemand += countsAsDemand ? (r.수량 || 0) : 0;
+        if (str(r.상태) === "완료") {
+          // 완료 건은 수요/가산 어느 쪽에도 반영하지 않음 (기존과 동일)
+        } else if (isSettled) {
+          cumDemand -= (r.수량 || 0);
+        } else {
+          cumDemand += (r.수량 || 0);
+        }
         const projected = baseInv + prodInTimeSum + kceInTimeSum - cumDemand;
 
         r._incomingProd = prodInTimeSum;
@@ -454,13 +460,13 @@ export default function App() {
     shipData.forEach(r => {
       if (str(r.품목명).includes("운반비") || str(r.품목명).includes("기타")) return;
       if (str(r.상태) === "완료") return;
-      // 결제란에 "후결"이 아닌 실제 정산액이 있으면 이미 완료된 건으로 취급해 제외 (비어있으면 기존과 동일하게 카운트)
-      if (str(r.결제) !== "" && str(r.결제) !== "후결") return;
       const code = str(r.품목번호).toUpperCase();
       if (!code) return;
       const due = normDate(r.납기일자);
       const e = (demandMap[code] ||= { totalDemand: 0, maxDue: null, hasUndated: false });
-      e.totalDemand += (r.수량 || 0);
+      // 결제란에 "후결"이 아닌 실제 정산액이 있으면 "선발행 건" — 수량만큼 가용재고에 가산(수요에서 차감)
+      const isSettled = str(r.결제) !== "" && str(r.결제) !== "후결";
+      e.totalDemand += isSettled ? -(r.수량 || 0) : (r.수량 || 0);
       if (!due) e.hasUndated = true;
       else if (!e.maxDue || due > e.maxDue) e.maxDue = due;
     });
