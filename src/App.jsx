@@ -387,7 +387,8 @@ export default function App() {
         const prodInTimeSum = sumQty(prodInTime);
         const kceInTimeSum = sumQty(kceInTime) + kceUndated;
 
-        cumDemand += str(r.상태) === "완료" ? 0 : (r.수량 || 0);
+        const countsAsDemand = str(r.상태) !== "완료" && str(r.결제) !== "후결";
+        cumDemand += countsAsDemand ? (r.수량 || 0) : 0;
         const projected = baseInv + prodInTimeSum + kceInTimeSum - cumDemand;
 
         r._incomingProd = prodInTimeSum;
@@ -446,6 +447,7 @@ export default function App() {
     shipData.forEach(r => {
       if (str(r.품목명).includes("운반비") || str(r.품목명).includes("기타")) return;
       if (str(r.상태) === "완료") return;
+      if (str(r.결제) === "후결") return;
       const code = str(r.품목번호).toUpperCase();
       if (!code) return;
       const due = normDate(r.납기일자);
