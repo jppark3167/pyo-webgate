@@ -276,7 +276,7 @@ function ShipRow({ item, method, onCycle }) {
                 <MethodCycleChip method={method} onCycle={onCycle} />
             </td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
-                {item._note && <span style={{ color: item._noteType === "dup" ? "#dc2626" : item._noteType === "esone" ? "#eab308" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>}
+                {item._note && <span style={{ color: item._noteType === "dup" ? "#dc2626" : (item._noteType === "esone" || item._noteType === "prepaid") ? "#eab308" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>}
                 {item._prodDoneNote && <div style={{ color: "#2563eb", fontWeight: "600", whiteSpace: "nowrap", marginTop: item._note ? "2px" : 0 }}>{item._prodDoneNote}</div>}
                 {!item._note && !item._prodDoneNote && <span style={{ color: "#cbd5e1" }}>-</span>}
             </td>

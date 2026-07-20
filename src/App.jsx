@@ -410,7 +410,11 @@ export default function App() {
         // 상태는 항상 실제 예상재고 기준. "중복 출하 확인필요"는 재고부족이면서 중복인 건에만 표시
         const isDup = str(r.상태) !== "완료" && due && (ordersByDate[due]?.size >= 2);
         r._status = projected < 0 ? "shortage" : "ok";
-        if (isDup && projected < 0) {
+        if (isSettled) {
+          // 결제 확정(후결 아님)으로 이미 재고에서 빠진 것으로 계산한 건 — 표시로 안내
+          r._note = "선발행 건";
+          r._noteType = "prepaid";
+        } else if (isDup && projected < 0) {
           // 품목명이 VBR/VDR/VRN이면 에스원 KCE 물량으로 안내 (노란색)
           const nm = str(r.품목명).toUpperCase();
           if (nm.includes("VBR") || nm.includes("VDR") || nm.includes("VRN")) {

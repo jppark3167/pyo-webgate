@@ -57,7 +57,7 @@ export function ShipCard({ item, method, onCycle }) {
                     </span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
-                    {item._note && <span style={{ fontSize: "0.7rem", color: item._noteType === "dup" ? "#dc2626" : item._noteType === "esone" ? "#eab308" : "#d97706", fontWeight: "700" }}>{item._note}</span>}
+                    {item._note && <span style={{ fontSize: "0.7rem", color: item._noteType === "dup" ? "#dc2626" : (item._noteType === "esone" || item._noteType === "prepaid") ? "#eab308" : "#d97706", fontWeight: "700" }}>{item._note}</span>}
                     {item._prodDoneNote && <span style={{ fontSize: "0.7rem", color: "#2563eb", fontWeight: "600" }}>{item._prodDoneNote}</span>}
                 </div>
             </div>
