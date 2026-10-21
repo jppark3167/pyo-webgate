@@ -5,6 +5,7 @@ import { InputView, DashView, HomeView, HelperView } from "./components/index";
 import { Login } from "./components/Login";
 import { AdminGate } from "./components/AdminGate";
 import { processProdFile, processInvFile } from "./excelParser";
+import { kceSupplyMap } from "./kce.js";
 import { api } from "./api";
 import { productionSchedule, productionSupply } from "./production.js";
 
@@ -245,9 +246,10 @@ export default function App() {
           입고예정일,                                   // 원본 메모 (표시/디버그용)
           미입고수,                                     // 아직 입고되지 않은 수량 (= 공급 반영 대상)
           담당자: c[5] || "",
+          비고: [c[6], c[7]].filter(Boolean).join(" / "),
           _schedule: parseKceSchedule(입고예정일, 미입고수, today),  // [{date, qty}] 절대일자
         };
-      }).filter(item => item.품번 && item.미입고수 > 0);
+      }).filter(item => item.품번 && item.미입고수 > 0 && !/발주\s*취소/.test(item.비고));
 
       setKceData(parsed);
       await api.saveKce(parsed);
@@ -282,28 +284,8 @@ export default function App() {
   // 출하일자 기준 공급 일정. 아침 현재고 이후(오늘 포함)만 추가 공급으로 반영.
   const prodQtyMap = useMemo(() => productionSchedule(prodData, toDateStr(new Date())), [prodData]);
 
-  // ── KCE 입고예정 맵 (품번 → {arrivals: [{date, qty}], undated}) ──────────
-  // arrivals = 오늘 이후(미입고) 일자 확정분, undated = 일자 미확정 미입고분(항상 가용으로 간주)
-  const kceQtyMap = useMemo(() => {
-    const todayStr = toDateStr(new Date());
-    const map = {};
-    kceData.forEach(item => {
-      const code = str(item.품번).toUpperCase();
-      if (!code) return;
-      if (!map[code]) map[code] = { arrivals: [], unreceived: 0 };
-      map[code].unreceived += (item.미입고수 ?? item.발주요청 ?? 0);
-      const sched = item._schedule
-        || (item.입고예정일 ? [{ date: normDate(item.입고예정일), qty: (item.미입고수 ?? item.발주요청 ?? 0) }] : []);
-      sched.forEach(s => map[code].arrivals.push({ date: normDate(s.date), qty: s.qty || 0 }));
-    });
-    Object.values(map).forEach(e => {
-      const future = e.arrivals.filter(a => a.date && a.date >= todayStr);
-      const futureSum = future.reduce((s, a) => s + a.qty, 0);
-      e.arrivals = future;
-      e.undated = Math.max(0, e.unreceived - futureSum);
-    });
-    return map;
-  }, [kceData]);
+  // 확정 입고 일정만 공급으로 반영. 미정과 지연은 별도 표시.
+  const kceQtyMap = useMemo(() => kceSupplyMap(kceData, toDateStr(new Date())), [kceData]);
 
   // ── 출하의뢰 enriched (납기일 기준 시점별 재고 배분) ─────────
   // 핵심: 납기일보다 늦게 들어오는 생산/KCE는 그 건의 가용재고로 잡지 않는다(결함 2).
@@ -321,7 +303,7 @@ export default function App() {
       const codeUpper = str(r.품목번호).toUpperCase();
       const prodArrivals = prodQtyMap[codeUpper] || [];
       const kceInfo = kceQtyMap[codeUpper] || { arrivals: [], undated: 0 };
-      const kceTotal = sumQty(kceInfo.arrivals) + kceInfo.undated;
+      const kceTotal = sumQty(kceInfo.arrivals);
 
       // KCE 품번인데 재고도 없고 KCE 입고예정도 전혀 없을 때만 비고 표시
       const isKCE = /^(NK|KT|K)/.test(codeUpper);
@@ -330,6 +312,7 @@ export default function App() {
       return {
         ...r, _skip: false, _codeUpper: codeUpper, _currentInvQty: currentInv,
         _prodArrivals: prodArrivals, _kceArrivals: kceInfo.arrivals, _kceUndated: kceInfo.undated,
+        _kceDelayed: kceInfo.delayed || 0,
         _kceNote: kceNote,
       };
     });
@@ -359,7 +342,7 @@ export default function App() {
       const baseInv = group[0]._currentInvQty;        // 현재고(즉시 가용)
       const prodArr = group[0]._prodArrivals;          // 동일 품목이므로 입고일정 공유
       const kceArr = group[0]._kceArrivals;
-      const kceUndated = group[0]._kceUndated;         // 일자 미확정분 — 항상 가용으로 간주
+
       let cumDemand = 0;
 
       group.forEach(r => {
@@ -372,7 +355,7 @@ export default function App() {
         const kceLate = kceArr.filter(late);
 
         const prodInTimeSum = sumQty(prodInTime);
-        const kceInTimeSum = sumQty(kceInTime) + kceUndated;
+        const kceInTimeSum = sumQty(kceInTime);
 
         // 결제란에 "후결"이 아닌 실제 정산액이 적혀 있으면 "선발행 건" — 이미 반영된 것이 아니라
         // 오히려 그만큼 가용재고에 더해줘야 하는 건(수량만큼 +가산). 결제란이 비어있는 건(애니원 탭 등
@@ -466,7 +449,7 @@ export default function App() {
       const inTime = a => !demand || demand.hasUndated || !demand.maxDue || a.date <= demand.maxDue;
 
       const prodIncoming = sumQty(prodSupply.inTime);
-      const kceIncoming = sumQty(kceInfo.arrivals.filter(inTime)) + kceInfo.undated;
+      const kceIncoming = sumQty(kceInfo.arrivals.filter(inTime));
       const pendingDemand = demand?.totalDemand || 0;
       const projected = currentInv + prodIncoming + kceIncoming - pendingDemand;
 

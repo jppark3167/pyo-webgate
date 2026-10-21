@@ -1,3 +1,4 @@
+import { KceTableRow, KceCompactItem } from "./KceSchedule";
 import React, { useState } from "react";
 import { fmtD, quickKeyOf, buildQuickValue, findKnownRecipient, nextShipMethod, stripCustomerPrefix } from "../utils";
 import { renderStatusBadge } from "./StatusBadge";
@@ -171,13 +172,10 @@ export function DashView({
                                     <th style={{ ...thStyle, width: "15%" }}>총 수량</th>
                                 </>)}
                                 {mainTab === "kce" && (<>
-                                    <th style={{ ...thStyle, width: "18%", textAlign: "left", paddingLeft: "0.5rem" }}>품번</th>
-                                    <th style={{ ...thStyle, width: "10%" }}>발주수량</th>
-                                    <th style={{ ...thStyle, width: "10%" }}>발주일</th>
-                                    <th style={{ ...thStyle, width: "27%", textAlign: "left", paddingLeft: "0.5rem" }}>입고예정</th>
-                                    <th style={{ ...thStyle, width: "10%", color: "#b45309" }}>미입고수</th>
-                                    <th style={{ ...thStyle, width: "10%" }}>담당자</th>
-                                    <th style={{ ...thStyle, width: "15%", textAlign: "left", paddingLeft: "0.5rem" }}>비고</th>
+                                    <th style={{ ...thStyle, width: "35%", textAlign: "left" }}>품번 · 클릭하여 상세</th>
+                                    <th style={{ ...thStyle, width: "10%" }}>미입고수</th>
+                                    <th style={{ ...thStyle, width: "43%", textAlign: "left" }}>입고 일정</th>
+                                    <th style={{ ...thStyle, width: "12%" }}>담당자</th>
                                 </>)}
                                 {mainTab === "summary" && (<>
                                     <th style={thStyle}>납기일자</th>
@@ -202,7 +200,7 @@ export function DashView({
                             ))}
 
                             {mainTab === "kce" && sortedKce.map((item, idx) => (
-                                <KceRow key={idx} item={item} />
+                                <KceTableRow key={idx} item={item} />
                             ))}
 
                             {mainTab === "summary" && dailySummaryData.map((item, idx) => (
@@ -277,6 +275,8 @@ function ShipRow({ item, method, onCycle }) {
             </td>
             <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
                 {item._note && <span style={{ color: item._noteType === "dup" ? "#dc2626" : (item._noteType === "esone" || item._noteType === "prepaid") ? "#eab308" : "#d97706", fontWeight: "700", wordBreak: "keep-all" }}>{item._note}</span>}
+                {item._kceDelayed > 0 && <div style={{ color: "#b91c1c" }}>KCE 입고 지연 {item._kceDelayed}개</div>}
+                {item._kceUndated > 0 && <div style={{ color: "#b45309" }}>KCE 일정 미정 {item._kceUndated}개</div>}
                 {item._prodDoneNote && <div style={{ color: "#2563eb", fontWeight: "600", whiteSpace: "nowrap", marginTop: item._note ? "2px" : 0 }}>{item._prodDoneNote}</div>}
                 {!item._note && !item._prodDoneNote && <span style={{ color: "#cbd5e1" }}>-</span>}
             </td>
@@ -284,46 +284,11 @@ function ShipRow({ item, method, onCycle }) {
     );
 }
 
-function KceRow({ item }) {
-    const dates = (item._schedule || []).map(s => `${fmtD(s.date)}(${s.qty})`).join(", ");
-    return (
-        <tr style={tbodyTrStyle}>
-            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontWeight: "600", wordBreak: "break-all" }}>{item.품번}</td>
-            <td style={tdStyle}>{item.발주수량}</td>
-            <td style={{ ...tdStyle, whiteSpace: "nowrap", fontSize: "0.7rem", color: "#64748b" }}>{item.발주일 || "-"}</td>
-            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem" }}>
-                {dates
-                    ? <div style={{ color: "#1e40af", fontWeight: "600" }}>{dates}</div>
-                    : <span style={{ color: "#94a3b8" }}>미정</span>}
-                {item.입고예정일 && <div style={{ color: "#cbd5e1", fontSize: "0.65rem", marginTop: "2px", wordBreak: "break-all" }}>{item.입고예정일}</div>}
-            </td>
-            <td style={{ ...tdStyle, fontWeight: "700", color: "#b45309" }}>{item.미입고수}</td>
-            <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{item.담당자 || "-"}</td>
-            <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem", color: "#94a3b8", wordBreak: "break-all" }}>{item.비고 || "-"}</td>
-        </tr>
-    );
-}
-
 function MobileKce({ data }) {
     if (data.length === 0) return <EmptyMessage />;
-    return (
-        <div style={{ paddingBottom: "1rem" }}>
-            {data.map((item, idx) => {
-                const dates = (item._schedule || []).map(s => `${fmtD(s.date)}(${s.qty})`).join(", ");
-                return (
-                    <div key={idx} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "0.75rem", marginBottom: "0.5rem", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                            <span style={{ fontWeight: "700", fontSize: "0.875rem", wordBreak: "break-all" }}>{item.품번}</span>
-                            <span style={{ fontSize: "0.8rem", fontWeight: "700", color: "#b45309", whiteSpace: "nowrap" }}>미입고 {item.미입고수}</span>
-                        </div>
-                        <div style={{ fontSize: "0.75rem", color: "#64748b" }}>발주 {item.발주수량} · {item.발주일 || "-"} · {item.담당자 || "-"}</div>
-                        <div style={{ fontSize: "0.75rem", color: dates ? "#1e40af" : "#94a3b8", marginTop: "0.25rem", fontWeight: "600" }}>{dates || "입고예정 미정"}</div>
-                        {item.비고 && <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginTop: "0.25rem" }}>{item.비고}</div>}
-                    </div>
-                );
-            })}
-        </div>
-    );
+    return <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
+        {data.map((item, idx) => <KceCompactItem key={idx} item={item} />)}
+    </div>;
 }
 
 function ProdAccordion({ item, sortedProd, selectedProdDate, setSelectedProdDate }) {

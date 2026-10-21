@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local KCE review page and screenshots
+/kce-preview.html
+/kce-preview*.png
+/src/kce-preview.jsx

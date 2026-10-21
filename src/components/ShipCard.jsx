@@ -58,6 +58,8 @@ export function ShipCard({ item, method, onCycle }) {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
                     {item._note && <span style={{ fontSize: "0.7rem", color: item._noteType === "dup" ? "#dc2626" : (item._noteType === "esone" || item._noteType === "prepaid") ? "#eab308" : "#d97706", fontWeight: "700" }}>{item._note}</span>}
+                    {item._kceDelayed > 0 && <span style={{ color: "#b91c1c", fontSize: "0.7rem" }}>KCE 입고 지연 {item._kceDelayed}개</span>}
+                    {item._kceUndated > 0 && <span style={{ color: "#b45309", fontSize: "0.7rem" }}>KCE 일정 미정 {item._kceUndated}개</span>}
                     {item._prodDoneNote && <span style={{ fontSize: "0.7rem", color: "#2563eb", fontWeight: "600" }}>{item._prodDoneNote}</span>}
                 </div>
             </div>

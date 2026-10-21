@@ -106,10 +106,10 @@ function parseKceText(text) {
             입고예정일,
             미입고수,
             담당자: c[5] || "",
-            비고: c[6] || "",
+            비고: [c[6], c[7]].filter(Boolean).join(" / "),
             _schedule: parseKceSchedule(입고예정일, 미입고수, today),
         };
-    }).filter(item => item.품번 && item.미입고수 > 0 && !item.비고.includes("발주취소"));
+    }).filter(item => item.품번 && item.미입고수 > 0 && !/발주\s*취소/.test(item.비고));
 }
 
 // 구글 시트 링크에서 TSV를 받아와 파싱까지 완료
