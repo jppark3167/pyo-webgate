@@ -36,7 +36,15 @@ export function toDateStr(d) {
 
 export function fmtXlDate(v) {
     if (!v && v !== 0) return "";
-    if (typeof v === "string") return v.slice(0, 10).replace(/\./g, "-");
+    if (typeof v === "string") {
+        const text = v.trim();
+        if (!text || text === "-" || text.includes("미정")) return "";
+        const date = normDate(text.replace(/\s+/g, ""));
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(`날짜 형식을 확인하세요: ${v}`);
+        const parsed = new Date(`${date}T00:00:00Z`);
+        if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) throw new Error(`유효하지 않은 날짜: ${v}`);
+        return date;
+    }
     if (typeof v === "number") {
         const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
         return d.toISOString().slice(0, 10);

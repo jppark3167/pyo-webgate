@@ -6,6 +6,7 @@ import { Login } from "./components/Login";
 import { AdminGate } from "./components/AdminGate";
 import { processProdFile, processInvFile } from "./excelParser";
 import { api } from "./api";
+import { productionSchedule, productionSupply } from "./production.js";
 
 // 납기일 오름차순 비교 (납기일 없는 건은 뒤로)
 const byDueDate = (a, b) => {
@@ -140,13 +141,13 @@ export default function App() {
 
   // ── 생산계획 파일 업로드 ─────────────────────
   const handleProdFile = useCallback(file => {
-    setProdFile(file.name);
     setParseMsg("생산계획 파일을 분석 중입니다...");
     processProdFile(
       file,
       async (parsedData) => {
-        setProdData(parsedData);
         await api.saveProd(parsedData, file.name);
+        setProdData(parsedData);
+        setProdFile(file.name);
         setParseMsg(`✅ 생산계획 파일 분석 완료 (${parsedData.length}건)`);
       },
       (errorMsg) => setParseMsg(errorMsg)
@@ -155,13 +156,13 @@ export default function App() {
 
   // ── 재고현황 파일 업로드 ─────────────────────
   const handleInvFile = useCallback(file => {
-    setInvFile(file.name);
     setParseMsg("재고현황 파일을 분석 중입니다...");
     processInvFile(
       file,
       async (parsedData) => {
-        setInvData(parsedData);
         await api.saveInv(parsedData, file.name);
+        setInvData(parsedData);
+        setInvFile(file.name);
         setParseMsg(`✅ 재고현황 파일 분석 완료 (${parsedData.length}건)`);
       },
       (errorMsg) => setParseMsg(errorMsg)
@@ -278,17 +279,8 @@ export default function App() {
     }
   };
 
-  // ── 생산계획 입고 일정 맵 (품번 → [{date, qty}]) ──────────────
-  // 생산계획일자를 입고 가능 시점으로 사용
-  const prodQtyMap = useMemo(() => {
-    const map = {};
-    prodData.forEach(item => {
-      const code = str(item.제품코드).toUpperCase();
-      if (!code) return;
-      (map[code] ||= []).push({ date: normDate(item.생산계획일자), qty: item.수량 || 0 });
-    });
-    return map;
-  }, [prodData]);
+  // 출하일자 기준 공급 일정. 아침 현재고 이후(오늘 포함)만 추가 공급으로 반영.
+  const prodQtyMap = useMemo(() => productionSchedule(prodData, toDateStr(new Date())), [prodData]);
 
   // ── KCE 입고예정 맵 (품번 → {arrivals: [{date, qty}], undated}) ──────────
   // arrivals = 오늘 이후(미입고) 일자 확정분, undated = 일자 미확정 미입고분(항상 가용으로 간주)
@@ -318,7 +310,6 @@ export default function App() {
   const shipEnriched = useMemo(() => {
     const sumQty = arr => arr.reduce((s, a) => s + (a.qty || 0), 0);
     const uniqDates = arr => [...new Set(arr.map(a => a.date).filter(Boolean))].sort();
-    const todayStr = toDateStr(new Date());
 
     // 1단계: 운반비/기타 제외 + 품목별 정적 정보(현재고·입고일정) 계산
     const rows = shipData.map(r => {
@@ -376,11 +367,7 @@ export default function App() {
         const inTime = a => !due || a.date <= due;     // 납기일까지 들어오면 가용
         const late = a => due && a.date > due;          // 납기일보다 늦게 들어옴
 
-        // 오늘 이전 생산계획 = 이미 생산 완료분 → 생산예정에 합산하지 않고 비고에 "mm/dd 생산"으로 표시
-        const prodDone = prodArr.filter(a => a.date && a.date < todayStr);
-        const prodPending = prodArr.filter(a => !a.date || a.date >= todayStr);
-        const prodInTime = prodPending.filter(inTime);
-        const prodLate = prodPending.filter(late);
+        const { inTime: prodInTime, late: prodLate, undated: prodUndated } = productionSupply(prodArr, due);
         const kceInTime = kceArr.filter(inTime);
         const kceLate = kceArr.filter(late);
 
@@ -404,9 +391,8 @@ export default function App() {
         r._incomingProdLate = sumQty(prodLate);
         r._prodDates = uniqDates(prodInTime);
         r._prodLateDates = uniqDates(prodLate);
-        r._prodDoneNote = prodDone.length > 0
-          ? uniqDates(prodDone).map(d => d.slice(5).replace("-", "/")).join(", ") + " 생산"
-          : null;
+        r._prodUndated = prodUndated;
+        r._prodDoneNote = prodUndated > 0 ? `출하 일정 미정 ${prodUndated}개 (예상재고 제외)` : null;
         r._kceIncoming = kceInTimeSum;
         r._kceIncomingLate = sumQty(kceLate);
         r._kceDates = uniqDates(kceInTime);
@@ -453,7 +439,6 @@ export default function App() {
   // 대시보드의 건별 계산(그룹 내 마지막 납기일 시점 기준)과 동일한 결과가 나오도록,
   // 미출하 대기 수량 중 가장 늦은 납기일(미확정 납기 포함)을 공급 반영 시점으로 사용한다.
   const invEnriched = useMemo(() => {
-    const todayStr = toDateStr(new Date());
     const sumQty = arr => arr.reduce((s, a) => s + (a.qty || 0), 0);
 
     const demandMap = {};
@@ -474,13 +459,13 @@ export default function App() {
     return invData.map(inv => {
       const code = str(inv.품번).toUpperCase();
       const currentInv = inv.재고수량 || 0;
-      const prodPending = (prodQtyMap[code] || []).filter(a => !a.date || a.date >= todayStr);
+      const prodSupply = productionSupply(prodQtyMap[code] || [], demandMap[code]?.hasUndated ? "" : demandMap[code]?.maxDue || "");
       const kceInfo = kceQtyMap[code] || { arrivals: [], undated: 0 };
       const demand = demandMap[code];
       // 미출하 대기 건이 없거나, 그중 납기 미확정 건이 있으면 입고예정 전부를 가용으로 간주
       const inTime = a => !demand || demand.hasUndated || !demand.maxDue || a.date <= demand.maxDue;
 
-      const prodIncoming = sumQty(prodPending.filter(inTime));
+      const prodIncoming = sumQty(prodSupply.inTime);
       const kceIncoming = sumQty(kceInfo.arrivals.filter(inTime)) + kceInfo.undated;
       const pendingDemand = demand?.totalDemand || 0;
       const projected = currentInv + prodIncoming + kceIncoming - pendingDemand;
@@ -488,7 +473,7 @@ export default function App() {
       return {
         품번: inv.품번, 품명: inv.품명, 규격: inv.규격,
         _currentInvQty: currentInv, _incomingProd: prodIncoming, _kceIncoming: kceIncoming,
-        _pendingDemand: pendingDemand, _projectedInvQty: projected,
+        _pendingDemand: pendingDemand, _projectedInvQty: projected, _prodUndated: prodSupply.undated,
         _status: projected < 0 ? "shortage" : "ok",
       };
     });

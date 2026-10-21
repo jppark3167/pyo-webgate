@@ -356,7 +356,7 @@ function ProdAccordion({ item, sortedProd, selectedProdDate, setSelectedProdDate
                                 {detailItems.map((d, di) => (
                                     <tr key={di} style={tbodyTrStyle}>
                                         <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.75rem", fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>{fmtD(d.생산계획일자) || "-"}</td>
-                                        <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>{fmtD(d.출하일자) || "-"}</td>
+                                        <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap" }}>{d.출하일자 && d.출하일자 !== "-" ? fmtD(d.출하일자) : "일정 미정"}</td>
                                         <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem", wordBreak: "keep-all" }}>{d.고객명}</td>
                                         <td style={{ ...tdStyle, textAlign: "left", paddingLeft: "0.5rem" }}>
                                             <div style={{ fontWeight: "600" }}>{d.모델명}</div>
@@ -521,7 +521,7 @@ function MobileProd({ data, sortedProd, selectedProdDate, setSelectedProdDate })
                                 </div>
                                 <div style={{ fontSize: "0.8rem", color: "#334155" }}>{d.모델명}</div>
                                 <div style={{ fontSize: "0.7rem", color: "#94a3b8", marginTop: "2px" }}>{d.제품코드}</div>
-                                <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>생산 {fmtD(d.생산계획일자) || "-"} · 출하 {fmtD(d.출하일자) || "-"}</div>
+                                <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>생산 {fmtD(d.생산계획일자) || "-"} · 출하 {d.출하일자 && d.출하일자 !== "-" ? fmtD(d.출하일자) : "일정 미정"}</div>
                             </div>
                         ))}
                     </div>

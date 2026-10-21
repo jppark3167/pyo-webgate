@@ -29,7 +29,7 @@ function InvCard({ r }) {
                 </div>
                 <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: "0.65rem", color: "#94a3b8" }}>생산예정</div>
-                    <div style={{ fontSize: "0.85rem" }}>{incoming(r._incomingProd)}</div>
+                    <div style={{ fontSize: "0.85rem" }}>{incoming(r._incomingProd)}{r._prodUndated > 0 && <div style={{ color: "#b45309", fontSize: "0.65rem" }}>일정 미정 {r._prodUndated}개 (제외)</div>}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: "0.65rem", color: "#94a3b8" }}>KCE입고</div>
@@ -99,7 +99,7 @@ export function InvSearch({ invItems }) {
                                                 {r.품명 || "-"}{r.규격 ? ` · ${r.규격}` : ""}
                                             </td>
                                             <td style={tdStyle}>{r._currentInvQty}</td>
-                                            <td style={tdStyle}>{incomingCell(r._incomingProd)}</td>
+                                            <td style={tdStyle}>{incomingCell(r._incomingProd)}{r._prodUndated > 0 && <div style={{ color: "#b45309", fontSize: "0.65rem" }}>일정 미정 {r._prodUndated}개 (제외)</div>}</td>
                                             <td style={tdStyle}>{incomingCell(r._kceIncoming)}</td>
                                             <td style={tdStyle}>{r._pendingDemand > 0 ? r._pendingDemand : <span style={{ color: "#94a3b8" }}>-</span>}</td>
                                             <td style={{ ...tdStyle, fontWeight: 700, color: r._projectedInvQty < 0 ? "#b45309" : "#334155" }}>{r._projectedInvQty}</td>

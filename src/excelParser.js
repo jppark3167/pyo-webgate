@@ -1,10 +1,10 @@
 import * as XLSX from "xlsx";
-import { fmtXlDate, str, num } from "./utils";
+import { fmtXlDate, str, num, toDateStr } from "./utils";
 
 // 🏭 생산계획 파일 파싱 로직
 export const processProdFile = (file, onSuccess, onError) => {
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = async e => {
         try {
             // cellDates:true는 xlsx 라이브러리가 KST 등 UTC+ 환경에서 Date 객체를 하루 앞당겨 생성하는 버그가 있어
             // 사용하지 않음 — 대신 원본 시리얼 숫자를 그대로 두고 fmtXlDate()의 숫자 변환(UTC 기준, 정확함)을 사용
@@ -22,7 +22,7 @@ export const processProdFile = (file, onSuccess, onError) => {
 
             for (let i = 0; i < Math.min(20, raw.length); i++) {
                 const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : "");
-                if (currentRow.includes("제품코드") || currentRow.includes("생산계획일자")) {
+                if (currentRow.includes("제품코드") && currentRow.includes("생산계획일자") && currentRow.includes("출하일자") && currentRow.includes("수량")) {
                     headerRowIdx = i;
                     headers = currentRow;
                     break;
@@ -30,7 +30,7 @@ export const processProdFile = (file, onSuccess, onError) => {
             }
 
             if (headerRowIdx === -1) {
-                onError("❌ 필수 헤더(생산계획 일자, 제품코드 등)를 찾을 수 없습니다. 엑셀 양식을 확인해주세요.");
+                onError("❌ 필수 헤더(생산계획일자, 출하일자, 제품코드, 수량)를 찾을 수 없습니다. 엑셀 양식을 확인해주세요.");
                 return;
             }
 
@@ -38,16 +38,10 @@ export const processProdFile = (file, onSuccess, onError) => {
                 planDate: headers.findIndex(h => h.includes("생산계획일자")),
                 shipDate: headers.findIndex(h => h.includes("출하일자")),
                 customer: headers.findIndex(h => h.includes("고객명")),
-                qty: headers.findIndex(h => h.includes("수량")),
+                qty: headers.findIndex(h => h === "수량"),
                 modelName: headers.findIndex(h => h.includes("모델명")),
                 prodCode: headers.findIndex(h => h.includes("제품코드"))
             };
-
-            // 💡 오늘 기준 -3일부터 끝까지 표시 (3일 이전 과거 데이터는 제외)
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const cutoffDate = new Date(today);
-            cutoffDate.setDate(cutoffDate.getDate() - 3);
 
             const parsedData = raw.slice(headerRowIdx + 1)
                 .map(row => ({
@@ -60,18 +54,16 @@ export const processProdFile = (file, onSuccess, onError) => {
                 }))
                 .filter(item => {
                     if (!item.제품코드) return false;
-                    // 생산계획일자가 비어있으면(날짜 미정) 그대로 통과 — 대시보드에서 "날짜미정"으로 표시됨
-                    if (item.생산계획일자) {
-                        const itemDate = new Date(item.생산계획일자);
-                        if (itemDate < cutoffDate) return false;
-                    }
-                    return true;
+                    // 아침 재고에 반영된 전날까지의 출하 가능 물량은 제외. 일정 미정은 보존.
+                    const referenceDate = item.출하일자 || item.생산계획일자;
+                    return !referenceDate || referenceDate >= toDateStr(new Date());
                 });
 
-            onSuccess(parsedData);
+            if (!parsedData.length) throw new Error("유효한 생산계획이 없습니다.");
+            await onSuccess(parsedData);
         } catch (error) {
             console.error("Excel Parsing Error:", error);
-            onError("❌ 생산계획 파일 파싱 중 오류가 발생했습니다.");
+            onError("❌ 생산계획 파일 처리 또는 저장에 실패했습니다.");
         }
     };
     reader.readAsArrayBuffer(file);
@@ -81,7 +73,7 @@ export const processProdFile = (file, onSuccess, onError) => {
 // 📦 재고현황 파일 파싱 로직 (개선본)
 export const processInvFile = (file, onSuccess, onError) => {
     const reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = async e => {
         try {
             const wb = XLSX.read(e.target.result, { type: "array" });
             const ws = wb.Sheets[wb.SheetNames[0]];
@@ -101,7 +93,7 @@ export const processInvFile = (file, onSuccess, onError) => {
                 const currentRow = raw[i].map(h => h ? String(h).replace(/\s+/g, '') : "");
 
                 // '품번' 관련 단어와 '재고' 관련 단어가 모두 있는 줄을 헤더로 인식
-                const hasItemCode = currentRow.some(h => h.includes("품번") || h.includes("품목코드") || h.includes("제품코드") || h.toUpperCase().includes("ITEM"));
+                const hasItemCode = currentRow.some(h => h.includes("품번") || h.includes("품목코드") || h.includes("제품코드") || ["ITEM", "ITEMCODE"].includes(h.toUpperCase()));
                 const hasQty = currentRow.some(h => h.includes("재고") || h.includes("수량") || h.includes("현재고"));
 
                 if (hasItemCode && hasQty) {
@@ -118,11 +110,13 @@ export const processInvFile = (file, onSuccess, onError) => {
 
             // 2. 정확한 컬럼 인덱스 찾기
             const idx = {
-                itemCode: headers.findIndex(h => h.includes("품번") || h.includes("품목코드") || h.includes("제품코드") || h.toUpperCase().includes("ITEM")),
+                itemCode: headers.findIndex(h => h.includes("품번") || h.includes("품목코드") || h.includes("제품코드") || ["ITEM", "ITEMCODE"].includes(h.toUpperCase())),
                 itemName: headers.findIndex(h => h.includes("품명") || h.includes("제품명") || h.toUpperCase().includes("NAME")),
                 spec: headers.findIndex(h => h.includes("규격") || h.toUpperCase().includes("SPEC")),
-                qty: headers.findIndex(h => h.includes("재고") || h.includes("수량") || h.includes("현재고"))
+                qty: headers.findIndex(h => h === "재고수량" || h === "현재고")
             };
+
+            if (idx.qty < 0) throw new Error("재고수량 또는 현재고 열이 필요합니다.");
 
             // 3. 데이터 매핑 및 필터링
             const parsedData = raw.slice(headerRowIdx + 1)
@@ -132,11 +126,11 @@ export const processInvFile = (file, onSuccess, onError) => {
                     규격: idx.spec !== -1 ? str(row[idx.spec]) : "",
                     재고수량: idx.qty !== -1 ? num(row[idx.qty]) : 0,
                 }))
-                .filter(item => item.품번); // 품번이 없는 빈 줄이나 쓰레기값 필터링
+                .filter(item => item.품번 && !["TOTAL", "합계", "소계", "품번"].includes(item.품번.toUpperCase())); // 품번이 없는 빈 줄이나 쓰레기값 필터링
 
             // 4. 결과 반환
             if (parsedData.length > 0) {
-                onSuccess(parsedData);
+                await onSuccess(parsedData);
             } else {
                 onError("⚠️ 유효한 재고현황 데이터를 찾을 수 없습니다.");
             }
