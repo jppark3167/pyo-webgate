@@ -1,7 +1,7 @@
 // shipSync.js — 구글 스프레드시트(뷰어 공개 또는 Apps Script 웹앱)에서 출하의뢰 데이터를 자동으로 가져와 파싱
 // TSV 컬럼 순서: 납기일 / 거래처명 / 품명 / 품목번호 / 수량 / 비고 / (선택) 배송방법힌트("퀵"|"택배") / (선택) 결제("후결" 등)
 // 7번째 컬럼은 거래처명이 없는 출하_애니원 같은 탭(출하타입 컬럼)을 통합할 때만 채워 보낸다.
-// 8번째 컬럼(결제)이 "후결"인 건은 재고계산(수요 차감)에서 제외한다.
+// 8번째 컬럼(결제)이 공란/"후결"이면 수요로 차감한다. 그 외는 현재고에서 선차감된 건이다.
 // kceSync.js의 export URL 변환·TSV 분리 로직을 그대로 재사용한다.
 
 const { splitExportedTsv, toExportUrl } = require("./kceSync");
@@ -13,16 +13,7 @@ const num = v => {
     return isNaN(n) ? 0 : n;
 };
 
-// 다양한 날짜 표기를 "YYYY-MM-DD"로 정규화 (src/utils.js normDate와 동일 규칙)
-function normDate(s) {
-    if (!s) return "";
-    const t = String(s).trim();
-    let m = t.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
-    if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
-    m = t.match(/^(\d{4})(\d{2})(\d{2})/);
-    if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-    return t.slice(0, 10);
-}
+const { normDate } = require("./dates");
 
 // TSV 텍스트 → 출하의뢰 데이터 배열
 function parseShipText(text) {
@@ -36,7 +27,7 @@ function parseShipText(text) {
             품목번호: c[3] || "",
             수량: num(c[4]),
             비고: c[5] || "",
-            결제: c[7] || "",   // "후결"이면 재고계산(수요 차감)에서 제외
+            결제: c[7] || "",   // 후결/공란은 수요, 그 외는 현재고 선차감
         };
         const hint = c[6] || "";
         if (hint === "퀵" || hint === "택배") row._배송방법힌트 = hint;   // 출하_애니원 등 출하타입 컬럼에서 넘어온 힌트

@@ -10,36 +10,7 @@ const num = v => {
     return isNaN(n) ? 0 : n;
 };
 
-function toDateStr(d) {
-    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-}
-
-// "M/D" + 연도 추론 → "YYYY-MM-DD" (오늘 기준 6개월 이상 과거면 내년으로 간주)
-function resolveMD(month, day, today) {
-    const y = today.getFullYear();
-    let d = new Date(y, month - 1, day);
-    const sixAgo = new Date(today);
-    sixAgo.setMonth(sixAgo.getMonth() - 6);
-    if (d < sixAgo) d = new Date(y + 1, month - 1, day);
-    return toDateStr(d);
-}
-
-// KCE 입고예정일 메모를 입고 일정 [{date, qty}]로 파싱 (src/utils.js와 동일 규칙)
-function parseKceSchedule(memo, unreceived, today) {
-    if (!memo) return [];
-    const out = [];
-    const re = /(\d+)\s*대\s*-?\s*(\d{1,2})\/(\d{1,2})/g;
-    let m;
-    while ((m = re.exec(memo)) !== null) {
-        out.push({ qty: parseInt(m[1], 10), date: resolveMD(+m[2], +m[3], today) });
-    }
-    if (out.length === 0) {
-        const single = memo.match(/(\d{1,2})\/(\d{1,2})/);
-        if (single) out.push({ qty: unreceived, date: resolveMD(+single[1], +single[2], today) });
-    }
-    return out;
-}
+const { parseKceSchedule } = require("./dates");
 
 // 탭 구분 텍스트 파싱 (따옴표로 묶인 셀 안의 줄바꿈/탭 보존) — src/utils.js와 동일
 // ⚠ 이 함수는 "클립보드 복사→붙여넣기" 텍스트(App.jsx handleKceParse)에만 사용한다.
@@ -95,7 +66,7 @@ function toExportUrl(sheetUrl) {
 function parseKceText(text) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const rows = splitExportedTsv(text.trim());
-    return rows.map(cols => {
+    return rows.filter(c => str(c[0]) && num(c[4]) > 0 && !/발주\s*취소/.test([c[6], c[7]].filter(Boolean).join(" / "))).map(cols => {
         const c = cols.map(x => str(x));
         const 입고예정일 = c[3] || "";
         const 미입고수 = num(c[4]);

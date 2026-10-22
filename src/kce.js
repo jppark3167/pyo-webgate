@@ -1,4 +1,4 @@
-import { normDate, num, str } from './utils.js';
+import { normDate, num, str, parseKceSchedule } from './utils.js';
 
 // 입고된 수량은 오래된 분할 일정부터 소진된 것으로 배분한다.
 // 잔량은 반드시 미입고수 이내로 제한하고 미확정/지연은 가용 공급에서 제외한다.
@@ -8,7 +8,13 @@ export function classifyKce(item, today) {
     let budget = remaining;
     const arrivals = [];
     let delayed = 0;
-    const schedule = (item._schedule || []).map(s => ({ date: normDate(s.date), qty: Math.max(0, num(s.qty)) }))
+    let source = item._schedule || [];
+    let warning = '';
+    if (str(item.입고예정일)) {
+        try { source = parseKceSchedule(item.입고예정일, remaining, new Date(`${today}T12:00:00`)); }
+        catch (error) { source = []; warning = error.message; }
+    }
+    const schedule = source.map(s => ({ date: normDate(s.date), qty: Math.max(0, num(s.qty)) }))
         .filter(s => /^\d{4}-\d{2}-\d{2}$/.test(s.date)).sort((a, b) => a.date.localeCompare(b.date));
     // 단일 날짜 파서는 이미 미입고수만 일정 수량으로 반환한다.
     if (schedule.reduce((sum, s) => sum + s.qty, 0) <= remaining) received = 0;
@@ -21,7 +27,7 @@ export function classifyKce(item, today) {
         if (s.date < today) delayed += qty;
         else arrivals.push({ date: s.date, qty });
     }
-    return { arrivals, delayed, undated: budget, remaining, note: str(item.비고) };
+    return { arrivals, delayed, undated: budget, remaining, note: [str(item.비고), warning].filter(Boolean).join(' / ') };
 }
 
 export function kceSupplyMap(items, today) {

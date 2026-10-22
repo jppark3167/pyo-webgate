@@ -6,17 +6,11 @@ import { Login } from "./components/Login";
 import { AdminGate } from "./components/AdminGate";
 import { processProdFile, processInvFile } from "./excelParser";
 import { kceSupplyMap } from "./kce.js";
+import { isPreDeducted, outstandingDemand } from "./shipmentDemand.js";
 import { api } from "./api";
 import { productionSchedule, productionSupply } from "./production.js";
 
-// 납기일 오름차순 비교 (납기일 없는 건은 뒤로)
-const byDueDate = (a, b) => {
-  const da = str(a.납기일자), db = str(b.납기일자);
-  if (!da && !db) return 0;
-  if (!da) return 1;
-  if (!db) return -1;
-  return da.localeCompare(db);
-};
+import { compareDueDates as byDueDate } from "./dates.js";
 
 // 출하의뢰 정렬: 컬럼 → {필드, 타입, 첫 클릭 기본방향}
 const SHIP_SORT = {
@@ -235,7 +229,7 @@ export default function App() {
       const today = new Date(); today.setHours(0, 0, 0, 0);
       const rows = parseTSV(kceText.trim());
 
-      const parsed = rows.map(cols => {
+      const parsed = rows.filter(c => str(c[0]) && num(c[4]) > 0 && !/발주\s*취소/.test([c[6], c[7]].filter(Boolean).join(" / "))).map(cols => {
         const c = cols.map(x => str(x));
         const 입고예정일 = c[3] || "";
         const 미입고수 = num(c[4]);
@@ -357,17 +351,9 @@ export default function App() {
         const prodInTimeSum = sumQty(prodInTime);
         const kceInTimeSum = sumQty(kceInTime);
 
-        // 결제란에 "후결"이 아닌 실제 정산액이 적혀 있으면 "선발행 건" — 이미 반영된 것이 아니라
-        // 오히려 그만큼 가용재고에 더해줘야 하는 건(수량만큼 +가산). 결제란이 비어있는 건(애니원 탭 등
-        // 결제 개념이 없는 소스)은 기존과 동일하게 항상 수요로 카운트.
-        const isSettled = str(r.결제) !== "" && str(r.결제) !== "후결";
-        if (str(r.상태) === "완료") {
-          // 완료 건은 수요/가산 어느 쪽에도 반영하지 않음 (기존과 동일)
-        } else if (isSettled) {
-          cumDemand -= (r.수량 || 0);
-        } else {
-          cumDemand += (r.수량 || 0);
-        }
+        // 선발행은 아침 현재고에서 이미 차감되어 있으므로 수요를 재차 반영하지 않는다.
+        const isSettled = isPreDeducted(r);
+        cumDemand += outstandingDemand(r);
         const projected = baseInv + prodInTimeSum + kceInTimeSum - cumDemand;
 
         r._incomingProd = prodInTimeSum;
@@ -387,7 +373,7 @@ export default function App() {
         r._status = projected < 0 ? "shortage" : "ok";
         if (isSettled) {
           // 결제 확정(후결 아님)으로 이미 재고에서 빠진 것으로 계산한 건 — 표시로 안내
-          r._note = "선발행 건";
+          r._note = "선발행 · 현재고 차감 반영됨";
           r._noteType = "prepaid";
         } else if (isDup && projected < 0) {
           // 품목명이 VBR/VDR/VRN이면 에스원 KCE 물량으로 안내 (노란색)
@@ -428,13 +414,13 @@ export default function App() {
     shipData.forEach(r => {
       if (str(r.품목명).includes("운반비") || str(r.품목명).includes("기타")) return;
       if (str(r.상태) === "완료") return;
+      if (isPreDeducted(r)) return;
       const code = str(r.품목번호).toUpperCase();
       if (!code) return;
       const due = normDate(r.납기일자);
       const e = (demandMap[code] ||= { totalDemand: 0, maxDue: null, hasUndated: false });
-      // 결제란에 "후결"이 아닌 실제 정산액이 있으면 "선발행 건" — 수량만큼 가용재고에 가산(수요에서 차감)
-      const isSettled = str(r.결제) !== "" && str(r.결제) !== "후결";
-      e.totalDemand += isSettled ? -(r.수량 || 0) : (r.수량 || 0);
+      // 선발행은 위에서 제외. 후결/결제 공란만 미출하 수요로 계산.
+      e.totalDemand += outstandingDemand(r);
       if (!due) e.hasUndated = true;
       else if (!e.maxDue || due > e.maxDue) e.maxDue = due;
     });

@@ -21,7 +21,7 @@ function ScheduleDetail({ item, today }) {
         {result.delayed > 0 && <div style={{ color: '#b91c1c' }}>입고 지연 {result.delayed}개 · 예상재고 제외</div>}
         {result.undated > 0 && <div style={{ color: '#92400e' }}>일정 미정 {result.undated}개 · 예상재고 제외</div>}
         <div style={{ color: '#64748b' }}>원본 입고예정일: {item.입고예정일 || '미기재'}</div>
-        {item.비고 && <div style={{ color: '#64748b', overflowWrap: 'anywhere' }}>메모: {item.비고}</div>}
+        {result.note && <div style={{ color: '#64748b', overflowWrap: 'anywhere' }}>메모: {result.note}</div>}
     </div>;
 }
 
