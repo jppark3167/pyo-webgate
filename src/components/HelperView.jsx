@@ -6,9 +6,11 @@ import { StatusBoard } from "./helper/StatusBoard";
 import { DateShipBoard } from "./helper/DateShipBoard";
 import { CloseoutBoard } from "./helper/CloseoutBoard";
 import { InvSearch } from "./helper/InvSearch";
+import { KyungdongAddressBook } from "./helper/KyungdongAddressBook";
 
 export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
     const [mode, setMode] = useState("home");
+    const [kyungdongRows, setKyungdongRows] = useState([{ id: 1 }]);
 
     // ── 홈: 하위 기능 분기 카드 ──────────────
     if (mode === "home") {
@@ -42,6 +44,7 @@ export function HelperView({ ships = [], quick = {}, onSave, invItems = [] }) {
             {mode === "status" && <StatusBoard ships={ships} quick={quick} onSave={onSave} />}
             {mode === "datelist" && <DateShipBoard ships={ships} quick={quick} />}
             {mode === "closeout" && <CloseoutBoard />}
+            {mode === "kyungdong" && <KyungdongAddressBook rows={kyungdongRows} setRows={setKyungdongRows} />}
             {mode === "inv" && <InvSearch invItems={invItems} />}
         </div>
     );
