@@ -1,6 +1,6 @@
 // App.jsx: 메인 애플리케이션 컴포넌트 (서버 연동 + KCE 입고일정 버전)
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { globalCss, str, num, findInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
+import { globalCss, str, num, findInv, findShipmentInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
 import { InputView, DashView, HomeView, HelperView } from "./components/index";
 import { Login } from "./components/Login";
 import { AdminGate } from "./components/AdminGate";
@@ -292,9 +292,9 @@ export default function App() {
       const isSkip = str(r.품목명).includes("운반비") || str(r.품목명).includes("기타");
       if (isSkip) return { ...r, _skip: true };
 
-      const inv = findInv(invData, r.품목번호);
+      const inv = findShipmentInv(invData, r);
       const currentInv = inv ? inv.재고수량 : 0;
-      const codeUpper = str(r.품목번호).toUpperCase();
+      const codeUpper = str(inv?.품번 || r.품목번호).toUpperCase();
       const prodArrivals = prodQtyMap[codeUpper] || [];
       const kceInfo = kceQtyMap[codeUpper] || { arrivals: [], undated: 0 };
       const kceTotal = sumQty(kceInfo.arrivals);
@@ -415,7 +415,8 @@ export default function App() {
       if (str(r.품목명).includes("운반비") || str(r.품목명).includes("기타")) return;
       if (str(r.상태) === "완료") return;
       if (isPreDeducted(r)) return;
-      const code = str(r.품목번호).toUpperCase();
+      const inv = findShipmentInv(invData, r);
+      const code = str(inv?.품번 || r.품목번호).toUpperCase();
       if (!code) return;
       const due = normDate(r.납기일자);
       const e = (demandMap[code] ||= { totalDemand: 0, maxDue: null, hasUndated: false });

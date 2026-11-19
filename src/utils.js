@@ -86,6 +86,18 @@ export function findInv(invData, itemCode) {
     return invData.find(r => str(r.품번).toUpperCase() === cCode) || null;
 }
 
+// 애니원 시트는 품번 대신 모델명을 제공할 수 있다.
+export function findShipmentInv(invData, row) {
+    const exact = findInv(invData, row.품목번호);
+    if (exact) return exact;
+    const customer = stripCustomerPrefix(normName(row.거래처명));
+    const model = str(row.품목명).toUpperCase();
+    const code = str(row.품목번호).toUpperCase();
+    if (customer !== "애니원" || !model || (code && code !== model)) return null;
+    const matches = invData.filter(inv => str(inv.품명).toUpperCase() === model);
+    return matches.length === 1 ? matches[0] : null;
+}
+
 // ── 퀵/출하방법 (quickData) 공용 ───────────────────────────
 // 출하방법 종류 + 칩 색상
 export const SHIP_METHODS = [
