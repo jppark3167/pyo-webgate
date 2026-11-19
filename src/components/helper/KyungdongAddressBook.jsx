@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { read, utils } from "xlsx/xlsx.mjs";
 import templateUrl from "../../assets/kyungdong-address-book.xlsx?url";
 import { createKyungdongAddressBook, MAX_SHIPMENTS } from "../../kyungdongAddressBook";
 import { toDateStr } from "../../utils";
@@ -28,6 +29,8 @@ function ShipmentInput({ label, value, onChange, type = "text", required = true,
 export function KyungdongAddressBook({ rows, setRows }) {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
+    const [preview, setPreview] = useState(null);
+    const currentPreview = preview?.source === rows ? preview : null;
 
     function update(id, name, value) {
         setError("");
@@ -36,6 +39,7 @@ export function KyungdongAddressBook({ rows, setRows }) {
 
     async function download(event) {
         event.preventDefault();
+        const showPreview = event.nativeEvent.submitter?.value === "preview";
         setBusy(true);
         setError("");
         try {
@@ -43,6 +47,13 @@ export function KyungdongAddressBook({ rows, setRows }) {
             const response = await fetch(templateUrl);
             if (!response.ok) throw new Error("엑셀 양식을 불러올 수 없습니다.");
             const bytes = createKyungdongAddressBook(new Uint8Array(await response.arrayBuffer()), rows, date);
+            if (showPreview) {
+                const workbook = read(bytes, { type: "array" });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const cells = utils.sheet_to_json(sheet, { header: 1, range: "A1:P11", defval: "", raw: false });
+                setPreview({ source: rows, date, cells });
+                return;
+            }
             const url = URL.createObjectURL(new Blob([bytes], {
                 type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             }));
@@ -116,8 +127,42 @@ export function KyungdongAddressBook({ rows, setRows }) {
                 <button type="submit" style={btn("#0f766e", "#fff")} disabled={busy}>
                     {busy ? "엑셀 생성 중…" : "엑셀 다운로드"}
                 </button>
+                <button type="submit" name="action" value="preview" style={btn("#e0f2fe", "#075985")} disabled={busy}>
+                    출력 시트 미리보기
+                </button>
                 <span style={{ fontSize: "0.8rem", color: "#64748b" }}>{rows.length} / {MAX_SHIPMENTS}건</span>
             </div>
+            {currentPreview && (
+                <section style={{ ...panel, marginTop: 20 }} aria-label="출력 시트 미리보기">
+                    <h3 style={{ margin: "0 0 12px", fontSize: "1rem", color: "#1e293b" }}>
+                        출력 시트 미리보기 · {currentPreview.date}
+                    </h3>
+                    <div tabIndex={0} role="region" aria-label="발송 주소록 출력 표" style={{ overflowX: "auto" }}>
+                        <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 1600, fontSize: "0.78rem" }}>
+                            <thead>
+                                <tr>
+                                    {currentPreview.cells[0].map((value, index) => (
+                                        <th key={index} scope="col" style={{ border: "1px solid #cbd5e1", padding: 8, background: "#e2e8f0", whiteSpace: "pre-wrap" }}>
+                                            {value}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {currentPreview.cells.slice(1).map((cells, rowIndex) => (
+                                    <tr key={rowIndex}>
+                                        {cells.map((value, columnIndex) => (
+                                            <td key={columnIndex} style={{ border: "1px solid #cbd5e1", padding: 8, whiteSpace: "pre-wrap", overflowWrap: "anywhere", verticalAlign: "top", background: rowIndex % 2 ? "#f8fafc" : "#fff" }}>
+                                                {value}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            )}
         </form>
     );
 }
