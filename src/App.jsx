@@ -2,6 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { globalCss, str, num, findInv, findShipmentInv, normDate, toDateStr, parseTSV, parseKceSchedule } from "./utils";
 import { InputView, DashView, HomeView, HelperView } from "./components/index";
+import { CustomerAddressBook } from "./components/CustomerAddressBook";
 import { Login } from "./components/Login";
 import { AdminGate } from "./components/AdminGate";
 import { processProdFile, processInvFile } from "./excelParser";
@@ -539,6 +540,12 @@ export default function App() {
     });
   }, [shipEnriched]);
 
+  const handleLogout = useCallback(() => {
+    api.logout();
+    setAuthed(false);
+    setAdminUnlocked(false);
+  }, []);
+
   // ── 로그인 화면 ────────────────────────────────
   if (!authed) return <Login onSuccess={() => { setLoading(true); setScreen("home"); setAuthed(true); }} />;
 
@@ -559,7 +566,7 @@ export default function App() {
       <style>{globalCss}</style>
       <HomeView
         onSelect={(key) => { setScreen(key); setView("dash"); setParseMsg(null); }}
-        onLogout={() => { api.logout(); setAuthed(false); setAdminUnlocked(false); }}
+        onLogout={handleLogout}
       />
     </>
   );
@@ -598,7 +605,7 @@ export default function App() {
             )}
             <button
               className="header-btn"
-              onClick={() => { api.logout(); setAuthed(false); setAdminUnlocked(false); }}
+              onClick={handleLogout}
               style={{ background: "transparent", color: "#cbd5e1", border: "1px solid #ffffff33", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
             >
               로그아웃
@@ -607,7 +614,9 @@ export default function App() {
         </div>
 
         <div className="page-container" style={{ padding: "16px" }}>
-          {screen === "helper" ? (
+          {screen === "customers" ? (
+            <CustomerAddressBook onUnauthorized={handleLogout} />
+          ) : screen === "helper" ? (
             <HelperView ships={shipData} quick={quick} onSave={handleSaveQuick} invItems={invEnriched} />
           ) : view === "input" ? (
             <InputView

@@ -6,10 +6,11 @@ const getToken = () => localStorage.getItem(TOKEN_KEY) || "";
 const setToken = (t) => localStorage.setItem(TOKEN_KEY, t);
 const clearToken = () => localStorage.removeItem(TOKEN_KEY);
 
-async function req(method, path, body) {
+async function req(method, path, body, signal) {
     const token = getToken();
     const res = await fetch(`${BASE}${path}`, {
         method,
+        signal,
         headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -49,6 +50,12 @@ export const api = {
         if (!res.ok) throw new Error(data.error || "비밀번호가 올바르지 않습니다.");
         return data;
     },
+    getCustomers: (signal) => req("GET", "/api/customers", undefined, signal),
+    suggestCustomerNames: (query, signal) =>
+        req("GET", "/api/customers/suggestions?q=" + encodeURIComponent(query), undefined, signal),
+    createCustomer: (customer) => req("POST", "/api/customers", customer),
+    updateCustomer: (id, customer) => req("PUT", "/api/customers/" + id, customer),
+    deleteCustomer: (id) => req("DELETE", "/api/customers/" + id),
     getData: () => req("GET", "/api/data"),
     saveShip: (shipData) => req("POST", "/api/ship", { shipData }),
     saveProd: (prodData, fileName) => req("POST", "/api/prod", { prodData, fileName }),

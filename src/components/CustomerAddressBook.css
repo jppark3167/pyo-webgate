@@ -1,0 +1,66 @@
+.customers {
+    max-width: 1050px;
+    margin: 0 auto;
+    color: #1e293b;
+    text-align: left;
+}
+
+.customers h1 { font-size: 1.45rem; }
+.customers h2 { font-size: 1.1rem; margin: 0 0 16px; }
+.customers h3 { font-size: 1rem; margin: 0; overflow-wrap: anywhere; }
+
+.customer-panel {
+    margin-bottom: 16px;
+    padding: 18px;
+    border: 1px solid #dce5ef;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.customer-panel fieldset {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 12px;
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.customer-panel label { display: grid; gap: 5px; font-size: .875rem; font-weight: 600; }
+.customer-panel label:last-child:has(textarea) { grid-column: 1 / -1; }
+
+.customer-panel input,
+.customer-panel textarea,
+.customer-panel button {
+    padding: 8px 10px;
+    border: 1px solid #b9c8d8;
+    border-radius: 8px;
+    background: #fff;
+    color: inherit;
+    font: inherit;
+}
+
+.customer-panel input,
+.customer-panel textarea { width: 100%; box-sizing: border-box; }
+.customer-panel textarea { resize: vertical; }
+.customer-panel button { cursor: pointer; font-size: .875rem; }
+.customer-panel button:disabled { opacity: .65; cursor: default; }
+.customer-panel .customer-primary { background: #2a368c; border-color: #2a368c; color: #fff; }
+.customer-search { max-width: 350px; }
+.customer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.customer-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 265px), 1fr));
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0;
+}
+
+.customer-list li { padding: 12px; border: 1px solid #dce5ef; border-radius: 8px; }
+.customer-list dl { margin: 8px 0 0; font-size: .875rem; }
+.customer-list dl div { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.customer-list dt { color: #475569; }
+.customer-list dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }

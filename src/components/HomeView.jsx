@@ -24,9 +24,18 @@ const IconTruck = () => (
     </svg>
 );
 
+const IconAddressBook = () => (
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="3" width="15" height="18" rx="2" />
+        <path d="M3 8h4M3 16h4M9 16a3.5 3.5 0 0 1 7 0" />
+        <circle cx="12.5" cy="9" r="2" />
+    </svg>
+);
+
 const cards = [
     { key: "helper", title: "출하 업무", desc: "퀵 리스트 확인 · 양식 맞춰 생성", accent: SKY, tint: "#e5f5fc", Icon: IconTruck },
     { key: "dashboard", title: "출하 대시보드", desc: "재고·납기 현황 확인", accent: NAVY, tint: "#e8eaf5", Icon: IconDashboard },
+    { key: "customers", title: "거래처 주소록", desc: "거래처 주소 · 연락처 관리", accent: NAVY, tint: "#e8eaf5", Icon: IconAddressBook },
 ];
 
 const cardStyle = (accent) => ({
@@ -76,7 +85,7 @@ export function HomeView({ onSelect, onLogout }) {
                     <div style={{ fontSize: "0.9rem", color: "#64748b", marginTop: 6 }}>원하는 메뉴를 선택하세요</div>
                 </div>
 
-                <div className="home-cards" style={{ display: "flex", gap: 28, flexWrap: "wrap", justifyContent: "center", width: "100%", maxWidth: 700 }}>
+                <div className="home-cards" style={{ display: "flex", gap: 28, flexWrap: "wrap", justifyContent: "center", width: "100%", maxWidth: 980 }}>
                     {cards.map(({ key, title, desc, accent, tint, Icon }) => (
                         <button key={key} className="home-card" style={cardStyle(accent)} onClick={() => onSelect(key)}>
                             <div style={{ width: 54, height: 54, borderRadius: 14, background: tint, color: accent, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>

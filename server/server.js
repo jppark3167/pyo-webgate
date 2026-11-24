@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 const { MongoClient } = require("mongodb");
 const crypto = require("crypto");
+const { createCustomerRouter } = require("./customers"); // eslint-disable-line no-undef
 const { fetchAndParseKceSheet } = require("./kceSync");
 const { fetchAndParseShipSheet, buildQuickSeeds } = require("./shipSync");
 
@@ -73,6 +74,8 @@ app.use("/api", (req, res, next) => {
     if (token !== AUTH_TOKEN) return res.status(401).json({ error: "인증이 필요합니다." });
     next();
 });
+
+app.use("/api/customers", createCustomerRouter(() => db.collection("customers")));
 
 // 출하타입 힌트가 있는 행만 quickData에 시드 — 이미 있는 key는 건드리지 않음(자동 동기화가 기존 퀵 지정을 덮어쓰지 않도록)
 async function seedShipQuick(parsed) {
